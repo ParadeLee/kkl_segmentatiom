@@ -1,0 +1,13 @@
+2021-09-14 15:19:34,655 INFO Let's go!
+2021-09-14 15:19:36,263 INFO Using adam optimizer
+2021-09-14 15:19:36,264 INFO Using optimizer Adam (
+Parameter Group 0
+    amsgrad: False
+    betas: (0.9, 0.999)
+    eps: 1e-08
+    lr: 0.0006
+    weight_decay: 0.0005
+)
+2021-09-14 15:19:36,264 INFO Using No LR Scheduling
+2021-09-14 15:19:36,264 INFO Using cross_entropy with {} params
+2021-09-14 15:19:36,264 INFO Using loss functools.partial(<function cross_entropy2d at 0x0000020EFFCB5A60>)
