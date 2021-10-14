@@ -105,7 +105,7 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 
-class NesT(nn.Module):
+class NesT(nn.Module): # image_size = 224*224; patch_size = 56*56;
     def __init__(
         self,
         *,
@@ -124,7 +124,7 @@ class NesT(nn.Module):
         super().__init__()
         assert (image_size % patch_size) == 0, 'Image dimensions must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
-        patch_dim = channels * patch_size ** 2
+        patch_dim = channels * patch_size ** 2 #
         fmap_size = image_size // patch_size
         blocks = 2 ** (num_hierarchies - 1)
 
