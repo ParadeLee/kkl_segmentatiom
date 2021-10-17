@@ -7,6 +7,68 @@ from einops.layers.torch import Rearrange, Reduce
 def cast_tuple(val, depth):
     return val if isinstance(val, tuple) else ((val,) * depth)
 
+class LayerNorm(nn.Module):
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
+        self.b = nn.Parameter(torch.zeros(1, dim, 1, 1))
+
+    def forward(self):
+        std = torch.var(x, dim=1, unbiased=False, keepdim=True).sqrt()
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = LayerNorm(dim)
+        self.fn = fn
+
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
+
+class FeedForward(nn.Module):
+    def __init__(self, dim, mlp_mult=4, dropout=0.):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(dim, dim * mlp_mult, 1),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Conv2d(dim * mlp_mult, dim, 1),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+def Aggregate(dim, dim_out):
+    return nn.Sequential(
+        nn.Conv2d(dim, dim_out, 3, padding = 1),
+        LayerNorm(dim_out),
+        nn.MaxPool2d(3, stride = 2, padding = 1)
+    )
+
+class Transformer(nn.Module):
+    def __init__(self, dim, seq_len, depth, heads, mlp_mult, dropout=0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        self.pos_emb = nn.Parameter(torch.randn(seq_len))
+
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads=heads, dropout=dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_mult, dropout=dropout))
+            ]))
+    def forward(self, x):
+        *_, h, w = x.shape
+
+        pos_emb = self.pos_emb[:(h * w)]
+        pos_emb = rearrange(pos_emb, '(h w) -> () () h w', h=h, w=w)
+        x = x + pos_emb
+
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        return x
+
 class NesT(nn.Module):
     def __init__(
             self,
