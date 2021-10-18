@@ -14,8 +14,40 @@ class LayerNorm(nn.Module):
         self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
         self.b = nn.Parameter(torch.zeros(1, dim, 1, 1))
 
-    def forward(self):
+    def forward(self, x):
         std = torch.var(x, dim=1, unbiased=False, keepdim=True).sqrt()
+        mean = torch.mean(x, dim=1, keepdim=True)
+        return (x - mean) / (std + self.eps) * self.g + self.b
+
+class Attention(nn.Module):
+    def __init__(self, dim, heads = 8, dropout = 0.):
+        super().__init__()
+        dim_head = dim // heads
+        inner_dim = dim_head * heads
+        self.heads = heads
+        self.scale = dim_head ** -0.5
+
+        self.attend = nn.Softmax(dim = -1)
+        self.to_qkv = nn.Conv2d(dim, inner_dim * 3, 1, bias = False)
+
+        self.to_out = nn.Sequential(
+            nn.Conv2d(inner_dim, dim, 1),
+            nn.Dropout(dropout)
+        )
+
+    def forward(self, x):
+        b, c, h, w, heads = *x.shape, self.heads
+
+        qkv = self.to_qkv(x).chunk(3, dim = 1)
+        q, k, v = map(lambda t: rearrange(t, 'b (h d) x y -> b h (x y) d', h = heads), qkv)
+
+        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
+
+        attn = self.attend(dots)
+
+        out = einsum('b h i j, b h j d -> b h i d', attn, v)
+        out = rearrange(out, 'b h (x y) d -> b (h d) x y', x = h, y = w)
+        return self.to_out(out)
 
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
@@ -69,6 +101,55 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 
+# classes
+class LayerNorm(nn.Module):
+    def __init__(self, dim, eps=1e-5):
+        super().__init__()
+        self.eps = eps
+        self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
+        self.b = nn.Parameter(torch.zeros(1, dim, 1, 1))
+
+    def forward(self, x):
+        std = torch.var(x, dim=1, unbiased=False, keepdim=True).sqrt()
+        mean = torch.mean(x, dim=1, keepdim=True)
+        return (x - mean) / (std + self.eps) * self.g + self.b
+
+class PreNorm(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = LayerNorm(dim)
+        self.fn = fn
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
+
+def Aggregate(dim, dim_out):
+    return nn.Sequential(
+        nn.Conv2d(dim, dim_out, 3, padding=1),
+        LayerNorm(dim_out),
+        nn.MaxPool2d(3, stride=2, padding=1)
+    )
+
+class Transformer(nn.Module):
+    def __init__(self, dim, seq_len, depth, heads, mlp_mult, dropout = 0.):
+        super().__init__()
+        self.layer = nn.ModuleList([])
+        self.pos_emb = nn.Parameter(torch.randn(seq_len))
+
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads=heads, dropout=dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_mult, dropout=dropout))
+            ]))
+    def forward(self, x):
+        *_, h, w = x.shape
+        pos_emb = self.pos_emb[:(h * w)]
+        pos_emb = rearrange(pos_emb, '(h w) -> () () h w', h=h, w=w)
+        x = x + pos_emb
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        return x
+
 class NesT(nn.Module):
     def __init__(
             self,
@@ -115,5 +196,17 @@ class NesT(nn.Module):
                 Transformer(dim_in, seq_len, depth, heads, mlp_mult, dropout),
                 Aggregate(dim_in, dim_out) if not is_last else nn.Identity()
             ]))
+        self.mlp_head = nn.Sequential(
+            LayerNorm(dim),
+            Reduce('b c h w -> b c', 'mean'),
+            nn.Linear(dim, num_classes)
+        )
+    def forward(self, img):
+        x = self.to_patch_embedding(img)
+        b, c, h, w = x.shape
+        num_hierarchies = len(self.layers)
 
+        for level, (transformer, aggregate) in zip(reversed(range(num_hierarchies)), self.layers):
+            block_size = 2 ** level
+            x = rearrange(x, 'b c (b1 h) (b2 w) -> (b b1 b2) c h w', b1=block_size, b2=block_size)
 
