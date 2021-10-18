@@ -102,53 +102,6 @@ class Transformer(nn.Module):
         return x
 
 # classes
-class LayerNorm(nn.Module):
-    def __init__(self, dim, eps=1e-5):
-        super().__init__()
-        self.eps = eps
-        self.g = nn.Parameter(torch.ones(1, dim, 1, 1))
-        self.b = nn.Parameter(torch.zeros(1, dim, 1, 1))
-
-    def forward(self, x):
-        std = torch.var(x, dim=1, unbiased=False, keepdim=True).sqrt()
-        mean = torch.mean(x, dim=1, keepdim=True)
-        return (x - mean) / (std + self.eps) * self.g + self.b
-
-class PreNorm(nn.Module):
-    def __init__(self, dim, fn):
-        super().__init__()
-        self.norm = LayerNorm(dim)
-        self.fn = fn
-    def forward(self, x, **kwargs):
-        return self.fn(self.norm(x), **kwargs)
-
-def Aggregate(dim, dim_out):
-    return nn.Sequential(
-        nn.Conv2d(dim, dim_out, 3, padding=1),
-        LayerNorm(dim_out),
-        nn.MaxPool2d(3, stride=2, padding=1)
-    )
-
-class Transformer(nn.Module):
-    def __init__(self, dim, seq_len, depth, heads, mlp_mult, dropout = 0.):
-        super().__init__()
-        self.layer = nn.ModuleList([])
-        self.pos_emb = nn.Parameter(torch.randn(seq_len))
-
-        for _ in range(depth):
-            self.layers.append(nn.ModuleList([
-                PreNorm(dim, Attention(dim, heads=heads, dropout=dropout)),
-                PreNorm(dim, FeedForward(dim, mlp_mult, dropout=dropout))
-            ]))
-    def forward(self, x):
-        *_, h, w = x.shape
-        pos_emb = self.pos_emb[:(h * w)]
-        pos_emb = rearrange(pos_emb, '(h w) -> () () h w', h=h, w=w)
-        x = x + pos_emb
-        for attn, ff in self.layers:
-            x = attn(x) + x
-            x = ff(x) + x
-        return x
 
 class NesT(nn.Module):
     def __init__(
@@ -161,10 +114,10 @@ class NesT(nn.Module):
             heads,
             num_hierarchies, # input
             block_repeats,
-            mlp_mult = 4,
-            channels = 3,
-            dim_head = 64,
-            dropout = 0.
+            mlp_mult=4,
+            channels=3,
+            dim_head=64,
+            dropout=0.
     ):
         super().__init__()
         assert (image_size % patch_size) == 0, 'Image dimension must be divisible by the patch size.'
@@ -192,14 +145,19 @@ class NesT(nn.Module):
         for level, heads, (dim_in, dim_out), block_repeats in zip(hierarchies, layer_heads, dim_pairs, block_repeats):
             is_last = level = 0
             depth = block_repeats
-            self.layers.append(nn.Modulelist([
+            self.layers.append(nn.ModuleList([
                 Transformer(dim_in, seq_len, depth, heads, mlp_mult, dropout),
                 Aggregate(dim_in, dim_out) if not is_last else nn.Identity()
             ]))
+        # self.mlp_head = nn.Sequential(
+        #     LayerNorm(dim),
+        #     Reduce('b c h w -> b c', 'mean'),
+        #     nn.Linear(dim, num_classes)
+        # )
         self.mlp_head = nn.Sequential(
-            LayerNorm(dim),
-            Reduce('b c h w -> b c', 'mean'),
-            nn.Linear(dim, num_classes)
+            nn.Conv2d(32, 1, 1),
+            nn.BatchNorm2d(num_classes),
+            nn.ReLU(inplace=True)
         )
     def forward(self, img):
         x = self.to_patch_embedding(img)
@@ -209,4 +167,8 @@ class NesT(nn.Module):
         for level, (transformer, aggregate) in zip(reversed(range(num_hierarchies)), self.layers):
             block_size = 2 ** level
             x = rearrange(x, 'b c (b1 h) (b2 w) -> (b b1 b2) c h w', b1=block_size, b2=block_size)
+            x = transformer(x)
+            x = rearrange(x, '(b b1 b2) c h w -> b c (b1 h) (b2 w)', b1=block_size, b2=block_size)
+            x = aggregate(x)
 
+        return self.mlp_head(x)

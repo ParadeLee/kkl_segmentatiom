@@ -55,7 +55,7 @@ class brainwebLoader_new(data.Dataset):
         # pd = m.imread(pd_path)
         # img = np.stack((t1,t2,pd), axis=2)
         lbl = np.array(Image.open(lbl_path))
-        newsize = 256
+        newsize = 224
         background = Image.new('RGB', (newsize, newsize), (0, 0, 0))  # black
         W = img.size[0]
         H = img.size[1]
