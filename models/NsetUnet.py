@@ -112,7 +112,7 @@ class NesT(nn.Module):
             num_classes,
             dim,
             heads,
-            num_hierarchies, # input
+            num_hierarchies, # input_hierarchies = 3
             block_repeats,
             mlp_mult=4,
             channels=3,
@@ -127,8 +127,8 @@ class NesT(nn.Module):
         blocks = 2 ** (num_hierarchies - 1)
 
         seq_len = (fmap_size // blocks) ** 2 # sequence length is held constant
-        hierarchies = list(reversed(range(num_hierarchies)))
-        mults = [2 ** i for i in hierarchies]
+        hierarchies = list(reversed(range(num_hierarchies))) # [3, 2, 1]
+        mults = [2 ** i for i in hierarchies] # [8, 4, 1]
 
         layer_heads = list(map(lambda t: t * heads, mults))
         layer_dims = list(map(lambda t: t * dim, mults))
@@ -137,7 +137,7 @@ class NesT(nn.Module):
         dim_pairs = zip(layer_dims[:-1], layer_dims[1:])
 
         self.to_patch_embedding = nn.Sequential(
-            Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1 = patch_size, p2 = patch_size),
+            Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1=patch_size, p2=patch_size),
             nn.Conv2d(patch_dim, layer_dims[0], 1),
         )
 
