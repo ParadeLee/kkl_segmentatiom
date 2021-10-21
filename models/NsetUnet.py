@@ -79,7 +79,7 @@ def Aggregate(dim, dim_out):
     )
 
 class Transformer(nn.Module):
-    def __init__(self, dim, seq_len, depth, heads, mlp_mult, dropout=0.):
+    def __init__(self, dim, seq_len, depth, heads, mlp_mult, dropout=0.): # Transformer的depth代表了Transformer_block的深度
         super().__init__()
         self.layers = nn.ModuleList([])
         self.pos_emb = nn.Parameter(torch.randn(seq_len))
@@ -107,13 +107,13 @@ class NesT(nn.Module):
     def __init__(
             self,
             x,
-            image_size,
-            patch_size,
-            num_classes,
-            dim,
-            heads,
+            image_size, # 224*224
+            patch_size, # 56*56
+            num_classes, # 4
+            dim, # 3
+            heads, # num_heads=8 看层数深度设置可以为[4,8,12,16]
             num_hierarchies, # input_hierarchies = 3
-            block_repeats,
+            block_repeats, # block_repeats=2
             mlp_mult=4,
             channels=3,
             dim_head=64,
@@ -128,6 +128,7 @@ class NesT(nn.Module):
 
         seq_len = (fmap_size // blocks) ** 2 # sequence length is held constant
         hierarchies = list(reversed(range(num_hierarchies))) # [3, 2, 1]
+        hierarchies_up = list(range(num_hierarchies)) # [1, 2, 3]
         mults = [2 ** i for i in hierarchies] # [8, 4, 1]
 
         layer_heads = list(map(lambda t: t * heads, mults))
@@ -140,7 +141,7 @@ class NesT(nn.Module):
             Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1=patch_size, p2=patch_size),
             nn.Conv2d(patch_dim, layer_dims[0], 1),
         )
-
+        # 构建Encoder层
         block_repeats = cast_tuple(block_repeats, num_hierarchies)
         for level, heads, (dim_in, dim_out), block_repeats in zip(hierarchies, layer_heads, dim_pairs, block_repeats):
             is_last = level = 0
@@ -149,6 +150,12 @@ class NesT(nn.Module):
                 Transformer(dim_in, seq_len, depth, heads, mlp_mult, dropout),
                 Aggregate(dim_in, dim_out) if not is_last else nn.Identity()
             ]))
+
+        # 构建Decoder层
+
+
+
+
         # self.mlp_head = nn.Sequential(
         #     LayerNorm(dim),
         #     Reduce('b c h w -> b c', 'mean'),
@@ -164,11 +171,17 @@ class NesT(nn.Module):
         b, c, h, w = x.shape
         num_hierarchies = len(self.layers)
 
+        # Encoder部分
+
         for level, (transformer, aggregate) in zip(reversed(range(num_hierarchies)), self.layers):
             block_size = 2 ** level
             x = rearrange(x, 'b c (b1 h) (b2 w) -> (b b1 b2) c h w', b1=block_size, b2=block_size)
             x = transformer(x)
             x = rearrange(x, '(b b1 b2) c h w -> b c (b1 h) (b2 w)', b1=block_size, b2=block_size)
             x = aggregate(x)
+
+        # Decoder部分
+
+
 
         return self.mlp_head(x)
