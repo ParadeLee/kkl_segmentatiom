@@ -102,6 +102,21 @@ class Transformer(nn.Module):
         return x
 
 # classes
+class DoubleConv(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_dim, out_dim, 3, padding=1),
+            nn.LayerNorm(out_dim),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_dim, out_dim, 3, padding=1),
+            nn.LayerNorm(out_dim),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, input):
+        return self.conv(input)
+
 
 class NesT(nn.Module):
     def __init__(
@@ -110,8 +125,8 @@ class NesT(nn.Module):
             image_size, # 224*224
             patch_size, # 56*56
             num_classes, # 4
-            dim, # 3
-            heads, # num_heads=8 看层数深度设置可以为[4,8,12,16]
+            dim, # 超参数，可以自己设置
+            heads, # num_heads=3 看层数深度设置可以为[3, 6, 12]
             num_hierarchies, # input_hierarchies = 3
             block_repeats, # block_repeats=2
             mlp_mult=4,
@@ -152,6 +167,7 @@ class NesT(nn.Module):
             ]))
 
         # 构建Decoder层
+        self.conv1 = DoubleConv()
 
 
 
@@ -170,6 +186,7 @@ class NesT(nn.Module):
         x = self.to_patch_embedding(img)
         b, c, h, w = x.shape
         num_hierarchies = len(self.layers)
+        skip_connection = []
 
         # Encoder部分
 
@@ -179,6 +196,7 @@ class NesT(nn.Module):
             x = transformer(x)
             x = rearrange(x, '(b b1 b2) c h w -> b c (b1 h) (b2 w)', b1=block_size, b2=block_size)
             x = aggregate(x)
+            skip_connection.append(x)
 
         # Decoder部分
 
