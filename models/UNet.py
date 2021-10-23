@@ -51,7 +51,7 @@ class Unet(nn.Module):
         p2 = self.pool2(c2)
         c3 = self.conv3(p2)
         p3 = self.pool3(c3)
-        c4 = self.conv4(p3)
+        c4 = self.conv4(p3) # 256
         p4 = self.pool4(c4)
         c5 = self.conv5(p4)
         up_6 = self.up6(c5)

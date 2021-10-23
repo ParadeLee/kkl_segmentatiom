@@ -135,7 +135,8 @@ class NesT(nn.Module):
             dropout=0.
     ):
         super().__init__()
-        assert (image_size % patch_size) == 0, 'Image dimension must be divisible by the patch size.'
+        assert (image_size % patch_size) == 0, \
+            'Image dimension must be divisible by the patch size.'
         num_patches = (image_size // patch_size) ** 2
         patch_dim = channels * patch_size ** 2
         fmap_size = image_size // patch_size
@@ -147,7 +148,7 @@ class NesT(nn.Module):
         mults = [2 ** i for i in hierarchies] # [8, 4, 1]
 
         layer_heads = list(map(lambda t: t * heads, mults))
-        layer_dims = list(map(lambda t: t * dim, mults))
+        layer_dims = list(map(lambda t: t * dim, mults)) #
 
         layer_dims = [*layer_dims, layer_dims[-1]]
         dim_pairs = zip(layer_dims[:-1], layer_dims[1:])
