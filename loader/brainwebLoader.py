@@ -54,6 +54,9 @@ class brainwebLoader(data.Dataset):
         # pd = m.imread(pd_path)
         # img = np.stack((t1,t2,pd), axis=2)
         lbl = m.imread(lbl_path)
+        newsize = 224
+        img = m.imresize(img, [newsize, newsize], interp='bilinear', mode=None)
+        lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
 
         img, lbl = self.transform(img, lbl)
 

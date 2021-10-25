@@ -109,7 +109,7 @@ class DoubleConv(nn.Module):
             nn.Conv2d(in_dim, out_dim, 3, padding=1),
             nn.BatchNorm2d(out_dim),
             nn.ReLU(inplace=True),
-            nn.Conv2d(in_dim, out_dim, 3, padding=1),
+            nn.Conv2d(out_dim, out_dim, 3, padding=1),
             nn.BatchNorm2d(out_dim),
             nn.ReLU(inplace=True)
         )
@@ -172,12 +172,19 @@ class NesTUnet(nn.Module):
 
         # 构建Decoder层
         # self.conv_bottom = DoubleConv(96, 192)
+        self.expand1 = nn.ConvTranspose2d(96, 96, 2, stride=2)
+        self.expand2 = nn.ConvTranspose2d(192, 192, 2, stride=2)
         self.up1 = nn.ConvTranspose2d(192, 96, 2, stride=2)
-        self.conv1 = DoubleConv(192, 96)
+        self.conv1 = DoubleConv(192, 192)
         self.up2 = nn.ConvTranspose2d(192, 96, 2, stride=2)
         self.conv2 = DoubleConv(192, 192)
-        self.up3 = nn.ConvTranspose2d(384, 192, 2, stride=2)
-        self.conv_final =DoubleConv(192, num_classes)
+        self.up3 = nn.ConvTranspose2d(192, 192, 2, stride=2)
+
+        self.PatchExpand = nn.Sequential(
+            nn.ConvTranspose2d(384, 192, 2, stride=2),
+            nn.ConvTranspose2d(192, 96, 2, stride=2)
+        )
+        self.conv_final =DoubleConv(96, num_classes)
 
         # self.mlp_head = nn.Sequential(
         #     LayerNorm(dim),
@@ -189,10 +196,11 @@ class NesTUnet(nn.Module):
         #     nn.BatchNorm2d(num_classes),
         #     nn.ReLU(inplace=True)
         # )
-        self.mlp_head = nn.Sequential(
+        self.bottom_head = nn.Sequential(
             LayerNorm(dim),
             # Reduce('b c h w -> b c', 'mean'),
-            nn.Conv2d(96, 192, 3, padding=1)
+            nn.Conv2d(96, 192, 3, padding=1),
+            nn.MaxPool2d(3, stride=2, padding=1)
         )
     def forward(self, img):
         x = self.to_patch_embedding(img)
@@ -211,17 +219,19 @@ class NesTUnet(nn.Module):
             skip_connection.append(x)
 
         # Decoder部分
-        print(skip_connection[2].shape)
-        x = self.mlp_head(x)
-        # x = self.conv_bottom(x)
+        x = self.bottom_head(x)
+
         x = self.up1(x)
         x = torch.cat([x, skip_connection[2]], dim=1)
         x = self.conv1(x)
         x = self.up2(x)
+        skip_connection[1] = self.expand1(skip_connection[1])
         x = torch.cat([x, skip_connection[1]], dim=1)
         x = self.conv2(x)
         x = self.up3(x)
+        skip_connection[0] = self.expand2(skip_connection[0])
         x = torch.cat([x, skip_connection[0]], dim=1)
+        x = self.PatchExpand(x)
         x = self.conv_final(x)
         out = torch.relu(x)
 
