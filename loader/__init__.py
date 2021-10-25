@@ -1,4 +1,4 @@
-from loader.brainwebLoader import brainwebLoader
+from loader.brainwebLoader_new import brainwebLoader_new
 from loader.mrbrainsLoader import mrbrainsLoader
 
 
@@ -7,7 +7,7 @@ def get_loader(name):
     :param name:
     """
     return {
-        "BrainWeb": brainwebLoader,
+        "BrainWeb": brainwebLoader_new,
         "MRBrainS": mrbrainsLoader,
         # "Brats": BratsLoader,
 		# 'Hyper': hyperLoader,

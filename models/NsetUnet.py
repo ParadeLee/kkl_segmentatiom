@@ -107,10 +107,10 @@ class DoubleConv(nn.Module):
         super().__init__()
         self.conv = nn.Sequential(
             nn.Conv2d(in_dim, out_dim, 3, padding=1),
-            nn.LayerNorm(out_dim),
+            nn.BatchNorm2d(out_dim),
             nn.ReLU(inplace=True),
             nn.Conv2d(in_dim, out_dim, 3, padding=1),
-            nn.LayerNorm(out_dim),
+            nn.BatchNorm2d(out_dim),
             nn.ReLU(inplace=True)
         )
 
@@ -123,7 +123,7 @@ class NesTUnet(nn.Module):
             self,
             *,
             image_size, # 224*224
-            patch_size, # 56*56
+            patch_size, # 4
             num_classes, # 4
             dim, # dim=96
             heads, # num_heads=3
@@ -160,6 +160,8 @@ class NesTUnet(nn.Module):
         )
         # 构建Encoder层
         block_repeats = cast_tuple(block_repeats, num_hierarchies)
+
+        self.layers = nn.ModuleList([])
         for level, heads, (dim_in, dim_out), block_repeats in zip(hierarchies, layer_heads, dim_pairs, block_repeats):
             is_last = level == 0
             depth = block_repeats
@@ -169,7 +171,7 @@ class NesTUnet(nn.Module):
             ]))
 
         # 构建Decoder层
-        self.conv_bottom = DoubleConv(96, 192)
+        # self.conv_bottom = DoubleConv(96, 192)
         self.up1 = nn.ConvTranspose2d(192, 96, 2, stride=2)
         self.conv1 = DoubleConv(192, 96)
         self.up2 = nn.ConvTranspose2d(192, 96, 2, stride=2)
@@ -187,6 +189,11 @@ class NesTUnet(nn.Module):
         #     nn.BatchNorm2d(num_classes),
         #     nn.ReLU(inplace=True)
         # )
+        self.mlp_head = nn.Sequential(
+            LayerNorm(dim),
+            # Reduce('b c h w -> b c', 'mean'),
+            nn.Conv2d(96, 192, 3, padding=1)
+        )
     def forward(self, img):
         x = self.to_patch_embedding(img)
         b, c, h, w = x.shape
@@ -204,7 +211,9 @@ class NesTUnet(nn.Module):
             skip_connection.append(x)
 
         # Decoder部分
-        x = self.conv_bottom(x)
+        print(skip_connection[2].shape)
+        x = self.mlp_head(x)
+        # x = self.conv_bottom(x)
         x = self.up1(x)
         x = torch.cat([x, skip_connection[2]], dim=1)
         x = self.conv1(x)

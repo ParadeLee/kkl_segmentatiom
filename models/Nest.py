@@ -105,7 +105,7 @@ class Transformer(nn.Module):
             x = ff(x) + x
         return x
 
-class NesT(nn.Module): # image_size = 224*224; patch_size = 56*56;
+class NesT(nn.Module):
     def __init__(
         self,
         *,

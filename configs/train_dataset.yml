@@ -1,5 +1,5 @@
 model:
-    arch: UNetRNN
+    arch: NestUnet
 data:
     dataset: BrainWeb
     train_split: train
