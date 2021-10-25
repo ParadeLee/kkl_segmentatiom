@@ -21,7 +21,7 @@ training:
         name: 'cross_entropy'
     lr_schedule:
     resume:
-    model_dir: trained_models/NseTUnet
+    model_dir: trained_models/NesTUnet
 
 testing:
     trained_model:
