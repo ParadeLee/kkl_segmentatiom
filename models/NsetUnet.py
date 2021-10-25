@@ -73,9 +73,9 @@ class FeedForward(nn.Module):
 
 def Aggregate(dim, dim_out):
     return nn.Sequential(
-        nn.Conv2d(dim, dim_out, 3, padding = 1),
+        nn.Conv2d(dim, dim_out, 3, padding=1),
         LayerNorm(dim_out),
-        nn.MaxPool2d(3, stride = 2, padding = 1)
+        nn.MaxPool2d(3, stride=2, padding=1)
     )
 
 class Transformer(nn.Module):
@@ -118,17 +118,17 @@ class DoubleConv(nn.Module):
         return self.conv(input)
 
 
-class NesT(nn.Module):
+class NesTUnet(nn.Module):
     def __init__(
             self,
-            x,
+            *,
             image_size, # 224*224
             patch_size, # 56*56
             num_classes, # 4
-            dim, # 超参数，可以自己设置
-            heads, # num_heads=3 看层数深度设置可以为[3, 6, 12]
+            dim, # dim=96
+            heads, # num_heads=3
             num_hierarchies, # input_hierarchies = 3
-            block_repeats, # block_repeats=2
+            block_repeats, # block_repeats=(2, 2, 8)
             mlp_mult=4,
             channels=3,
             dim_head=64,
@@ -143,15 +143,16 @@ class NesT(nn.Module):
         blocks = 2 ** (num_hierarchies - 1)
 
         seq_len = (fmap_size // blocks) ** 2 # sequence length is held constant
-        hierarchies = list(reversed(range(num_hierarchies))) # [3, 2, 1]
-        hierarchies_up = list(range(num_hierarchies)) # [1, 2, 3]
-        mults = [2 ** i for i in hierarchies] # [8, 4, 1]
+        hierarchies = list(reversed(range(num_hierarchies))) # [2, 1, 0]
+        hierarchies_up = list(range(num_hierarchies)) # [0, 1, 2]
+        mults = [2 ** i for i in hierarchies] # [4, 2, 1]
+        # mults = [4 for i in hierarchies]
 
         layer_heads = list(map(lambda t: t * heads, mults))
-        layer_dims = list(map(lambda t: t * dim, mults)) #
+        layer_dims = list(map(lambda t: t * dim, mults)) # [384， 192， 98]
 
-        layer_dims = [*layer_dims, layer_dims[-1]]
-        dim_pairs = zip(layer_dims[:-1], layer_dims[1:])
+        layer_dims = [*layer_dims, layer_dims[-1]] # [384， 192， 98， 98]
+        dim_pairs = zip(layer_dims[:-1], layer_dims[1:]) # [(4*dim, 2*dim), (2*dim, 1*dim), (1*dim, 1*dim)]
 
         self.to_patch_embedding = nn.Sequential(
             Rearrange('b c (h p1) (w p2) -> b (p1 p2 c) h w', p1=patch_size, p2=patch_size),
@@ -160,7 +161,7 @@ class NesT(nn.Module):
         # 构建Encoder层
         block_repeats = cast_tuple(block_repeats, num_hierarchies)
         for level, heads, (dim_in, dim_out), block_repeats in zip(hierarchies, layer_heads, dim_pairs, block_repeats):
-            is_last = level = 0
+            is_last = level == 0
             depth = block_repeats
             self.layers.append(nn.ModuleList([
                 Transformer(dim_in, seq_len, depth, heads, mlp_mult, dropout),
@@ -168,21 +169,24 @@ class NesT(nn.Module):
             ]))
 
         # 构建Decoder层
-        self.conv1 = DoubleConv()
-
-
-
+        self.conv_bottom = DoubleConv(96, 192)
+        self.up1 = nn.ConvTranspose2d(192, 96, 2, stride=2)
+        self.conv1 = DoubleConv(192, 96)
+        self.up2 = nn.ConvTranspose2d(192, 96, 2, stride=2)
+        self.conv2 = DoubleConv(192, 192)
+        self.up3 = nn.ConvTranspose2d(384, 192, 2, stride=2)
+        self.conv_final =DoubleConv(192, num_classes)
 
         # self.mlp_head = nn.Sequential(
         #     LayerNorm(dim),
         #     Reduce('b c h w -> b c', 'mean'),
         #     nn.Linear(dim, num_classes)
         # )
-        self.mlp_head = nn.Sequential(
-            nn.Conv2d(32, 1, 1),
-            nn.BatchNorm2d(num_classes),
-            nn.ReLU(inplace=True)
-        )
+        # self.mlp_head = nn.Sequential(
+        #     nn.Conv2d(32, 1, 1),
+        #     nn.BatchNorm2d(num_classes),
+        #     nn.ReLU(inplace=True)
+        # )
     def forward(self, img):
         x = self.to_patch_embedding(img)
         b, c, h, w = x.shape
@@ -200,7 +204,17 @@ class NesT(nn.Module):
             skip_connection.append(x)
 
         # Decoder部分
+        x = self.conv_bottom(x)
+        x = self.up1(x)
+        x = torch.cat([x, skip_connection[2]], dim=1)
+        x = self.conv1(x)
+        x = self.up2(x)
+        x = torch.cat([x, skip_connection[1]], dim=1)
+        x = self.conv2(x)
+        x = self.up3(x)
+        x = torch.cat([x, skip_connection[0]], dim=1)
+        x = self.conv_final(x)
+        out = torch.relu(x)
 
-
-
-        return self.mlp_head(x)
+        return out
+        # return self.mlp_head(x)
