@@ -14,6 +14,7 @@ class brainwebLoader(data.Dataset):
     """docstring for brainWebLoader"""
 
     def __init__(self, root, split="train"):
+    # def __init__(self, split="train"):
         # root = '/data/home/ywen/lk/datasets/brainweb/'
         root = 'datasets/brainweb/'
         self.root = root
@@ -118,7 +119,6 @@ class brainwebLoader(data.Dataset):
 
 
 def debug_load():
-    # root = 'kkl_segmentatiom/datasets/brainweb'
     root = 'datasets/brainweb/'
     t_loader = brainwebLoader(
         root,
