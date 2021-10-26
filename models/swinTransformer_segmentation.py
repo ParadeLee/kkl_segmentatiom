@@ -58,8 +58,8 @@ def window_reverse(windows, window_size, H, W):
     Args:
         windows: (num_windows*B, window_size, window_size, C)
         window_size (int): Window size
-        H (int): Height of image
-        W (int): Width of image
+        H (int): Height of images
+        W (int): Width of images
 
     Returns:
         x: (B, H, W, C)
@@ -407,7 +407,7 @@ class PatchEmbed(nn.Module):
 
     Args:
         patch_size (int): Patch token size. Default: 4.
-        in_chans (int): Number of input image channels. Default: 3.
+        in_chans (int): Number of input images channels. Default: 3.
         embed_dim (int): Number of linear projection output channels. Default: 96.
         norm_layer (nn.Module, optional): Normalization layer. Default: None
     """
@@ -452,10 +452,10 @@ class SwinTransformer(nn.Module):
           https://arxiv.org/pdf/2103.14030
 
     Args:
-        pretrain_img_size (int): Input image size for training the pretrained model,
+        pretrain_img_size (int): Input images size for training the pretrained model,
             used in absolute postion embedding. Default 224.
         patch_size (int | tuple(int)): Patch size. Default: 4.
-        in_chans (int): Number of input image channels. Default: 3.
+        in_chans (int): Number of input images channels. Default: 3.
         embed_dim (int): Number of linear projection output channels. Default: 96.
         depths (tuple[int]): Depths of each Swin Transformer stage.
         num_heads (tuple[int]): Number of attention head of each stage.
@@ -505,7 +505,7 @@ class SwinTransformer(nn.Module):
         self.out_indices = out_indices
         self.frozen_stages = frozen_stages
 
-        # split image into non-overlapping patches
+        # split images into non-overlapping patches
         self.patch_embed = PatchEmbed(
             patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim,
             norm_layer=norm_layer if self.patch_norm else None)

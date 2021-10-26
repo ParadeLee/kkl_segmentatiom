@@ -4,7 +4,7 @@ data:
     dataset: BrainWeb
     train_split: train
     val_split: val
-    path: /data/home/ywen/sxx/RDC/datasets/brainweb/
+    path: datasets/brainweb/
 
 training:
     gpu_idx: 0
@@ -24,6 +24,6 @@ training:
     model_dir: trained_models/NesTUnet
 
 testing:
-    trained_model:
-    path:
+    trained_model: trained_models/NesTUnet/NestUnet_BrainWeb.pkl
+    path: trained_models/NesTUnet/images
     boxplot: False

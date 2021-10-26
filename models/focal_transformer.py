@@ -65,8 +65,8 @@ def window_reverse(windows, window_size, H, W):
     Args:
         windows: (num_windows*B, window_size, window_size, C)
         window_size (int): Window size
-        H (int): Height of image
-        W (int): Width of image
+        H (int): Height of images
+        W (int): Width of images
 
     Returns:
         x: (B, H, W, C)
@@ -430,7 +430,7 @@ class WindowAttention(nn.Module):
                                                                        window_area:window_area_rolled] + self.relative_position_bias_table_to_neighbors
 
         if self.pool_method != "none" and self.focal_level > 1:
-            # add relative position bias for different windows in an image
+            # add relative position bias for different windows in an images
             offset = window_area_rolled
             for k in range(self.focal_level - 1):
                 # add relative position bias
@@ -887,7 +887,7 @@ class PatchEmbed(nn.Module):
     Args:
         img_size (int): Image size.  Default: 224.
         patch_size (int): Patch token size. Default: 4.
-        in_chans (int): Number of input image channels. Default: 3.
+        in_chans (int): Number of input images channels. Default: 3.
         embed_dim (int): Number of linear projection output channels. Default: 96.
         use_conv_embed (bool): Wherther use overlapped convolutional embedding layer. Default: False.
         norm_layer (nn.Module, optional): Normalization layer. Default: None
@@ -938,7 +938,7 @@ class PatchEmbed(nn.Module):
         B, C, H, W = x.shape
         # FIXME look at relaxing size constraints
         assert H == self.img_size[0] and W == self.img_size[1], \
-            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+            f"Input images size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
 
         if self.use_pre_norm:
             x = self.pre_norm(x)
@@ -960,9 +960,9 @@ class FocalTransformer(nn.Module):
     r""" Focal Transformer: Focal Self-attention for Local-Global Interactions in Vision Transformer
 
     Args:
-        img_size (int | tuple(int)): Input image size. Default 224
+        img_size (int | tuple(int)): Input images size. Default 224
         patch_size (int | tuple(int)): Patch size. Default: 4
-        in_chans (int): Number of input image channels. Default: 3
+        in_chans (int): Number of input images channels. Default: 3
         num_classes (int): Number of classes for classification head. Default: 1000
         embed_dim (int): Patch embedding dimension. Default: 96
         depths (tuple(int)): Depth of each Focal Transformer layer.
@@ -1033,7 +1033,7 @@ class FocalTransformer(nn.Module):
         self.num_features = int(embed_dim * 2 ** (self.num_layers - 1))
         self.mlp_ratio = mlp_ratio
 
-        # split image into patches using either non-overlapped embedding or overlapped embedding
+        # split images into patches using either non-overlapped embedding or overlapped embedding
         self.patch_embed = PatchEmbed(
             img_size=to_2tuple(img_size), patch_size=patch_size, in_chans=in_chans, embed_dim=embed_dim,
             use_conv_embed=use_conv_embed, is_stem=True,

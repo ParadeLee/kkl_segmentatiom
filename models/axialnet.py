@@ -670,7 +670,7 @@ class medt_net(nn.Module):# input_size[1, 3, 181, 181]
         x = F.relu(F.interpolate(self.decoder5(x), scale_factor=(2, 2), mode='bilinear'))
         # print(x.shape)
         '''Global Branch end!!'''
-        # end of full image training
+        # end of full images training
 
         # y_out = torch.ones((1,2,128,128))
         x_loc = x.clone()

@@ -42,8 +42,8 @@ def correct_dims(*images):
 
 class JointTransform2D:
     """
-    Performs augmentation on image and mask when called. Due to the randomness of augmentation transforms,
-    it is not enough to simply apply the same Transform from torchvision on the image and mask separetely.
+    Performs augmentation on images and mask when called. Due to the randomness of augmentation transforms,
+    it is not enough to simply apply the same Transform from torchvision on the images and mask separetely.
     Doing this will result in messing up the ground truth mask. To circumvent this problem, this class can
     be used, which will take care of the problems above.
 
@@ -68,7 +68,7 @@ class JointTransform2D:
         self.long_mask = long_mask
 
     def __call__(self, image, mask):
-        # transforming to PIL image
+        # transforming to PIL images
         image, mask = F.to_pil_image(image), F.to_pil_image(mask)
 
         # random crop
@@ -103,7 +103,7 @@ class ImageToImage2D(Dataset):
     Reads the images and applies the augmentation transform on them.
     Usage:
         1. If used without the unet.model.Model wrapper, an instance of this object should be passed to
-           torch.utils.data.DataLoader. Iterating through this returns the tuple of image, mask and image
+           torch.utils.data.DataLoader. Iterating through this returns the tuple of images, mask and images
            filename.
         2. With unet.model.Model wrapper, an instance of this object should be passed as train or validation
            datasets.
@@ -121,7 +121,7 @@ class ImageToImage2D(Dataset):
                   |-- ...
 
         joint_transform: augmentation transform, an instance of JointTransform2D. If bool(joint_transform)
-            evaluates to False, torchvision.transforms.ToTensor will be used on both image and mask.
+            evaluates to False, torchvision.transforms.ToTensor will be used on both images and mask.
         one_hot_mask: bool, if True, returns the mask in one-hot encoded form.
     """
 
@@ -144,20 +144,20 @@ class ImageToImage2D(Dataset):
     def __getitem__(self, idx):
         image_filename = self.images_list[idx]
         #print(image_filename[: -3])
-        # read image
+        # read images
         # print(os.path.join(self.input_path, image_filename))
         # print(os.path.join(self.output_path, image_filename[: -3] + "png"))
         # print(os.path.join(self.input_path, image_filename))
         image = cv2.imread(os.path.join(self.input_path, image_filename))
-        # print(image.shape)
-        # read mask image
+        # print(images.shape)
+        # read mask images
         mask = cv2.imread(os.path.join(self.output_path, image_filename[: -3] + "png"),0)
         
         mask[mask<=127] = 0
         mask[mask>127] = 1
         # correct dimensions if needed
         image, mask = correct_dims(image, mask)
-        # print(image.shape)
+        # print(images.shape)
 
         if self.joint_transform:
             image, mask = self.joint_transform(image, mask)
@@ -166,11 +166,11 @@ class ImageToImage2D(Dataset):
             assert self.one_hot_mask > 0, 'one_hot_mask must be nonnegative'
             mask = torch.zeros((self.one_hot_mask, mask.shape[1], mask.shape[2])).scatter_(0, mask.long(), 1)
         # mask = np.swapaxes(mask,2,0)
-        # print(image.shape)
+        # print(images.shape)
         # print(mask.shape)
         # mask = np.transpose(mask,(2,0,1))
-        # image = np.transpose(image,(2,0,1))
-        # print(image.shape)
+        # images = np.transpose(images,(2,0,1))
+        # print(images.shape)
         # print(mask.shape)
 
         return image, mask, image_filename
@@ -179,10 +179,10 @@ class ImageToImage2D(Dataset):
 class Image2D(Dataset):
     """
     Reads the images and applies the augmentation transform on them. As opposed to ImageToImage2D, this
-    reads a single image and requires a simple augmentation transform.
+    reads a single images and requires a simple augmentation transform.
     Usage:
         1. If used without the unet.model.Model wrapper, an instance of this object should be passed to
-           torch.utils.data.DataLoader. Iterating through this returns the tuple of image and image
+           torch.utils.data.DataLoader. Iterating through this returns the tuple of images and images
            filename.
         2. With unet.model.Model wrapper, an instance of this object should be passed as a prediction
            dataset.
@@ -220,13 +220,13 @@ class Image2D(Dataset):
 
         image = cv2.imread(os.path.join(self.input_path, image_filename))
 
-        # image = np.transpose(image,(2,0,1))
+        # images = np.transpose(images,(2,0,1))
 
         image = correct_dims(image)
 
         image = self.transform(image)
 
-        # image = np.swapaxes(image,2,0)
+        # images = np.swapaxes(images,2,0)
 
         return image, image_filename
 

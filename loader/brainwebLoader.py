@@ -56,9 +56,9 @@ class brainwebLoader(data.Dataset):
         # pd = m.imread(pd_path)
         # img = np.stack((t1,t2,pd), axis=2)
         lbl = m.imread(lbl_path)
-        newsize = 224
-        img = m.imresize(img, [newsize, newsize], interp='bilinear', mode=None)
-        lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
+        # newsize = 224
+        # img = m.imresize(img, [newsize, newsize], interp='bilinear', mode=None)
+        # lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
 
         img, lbl = self.transform(img, lbl)
 
@@ -118,10 +118,10 @@ class brainwebLoader(data.Dataset):
 
 
 def debug_load():
-    root = '/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/'
-
+    # root = 'kkl_segmentatiom/datasets/brainweb'
+    root = 'datasets/brainweb/'
     t_loader = brainwebLoader(
-		root,
+        root,
 		split='trainval')
 
     n_classes = t_loader.n_classes
@@ -136,7 +136,7 @@ def debug_load():
 
         labels = np.squeeze(labels.data.numpy())
         decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/result_image_when_training/brainweb', '{}.bmp'.format(img_name[0])), decoded)
+        m.imsave(pjoin('trained_models/brainweb', '{}.bmp'.format(img_name[0])), decoded)
         print('.')
 
         # tensor2numpy
