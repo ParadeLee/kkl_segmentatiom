@@ -40,11 +40,8 @@ class Attention(nn.Module):
 
         qkv = self.to_qkv(x).chunk(3, dim = 1)
         q, k, v = map(lambda t: rearrange(t, 'b (h d) x y -> b h (x y) d', h = heads), qkv)
-
         dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
-
         attn = self.attend(dots)
-
         out = einsum('b h i j, b h j d -> b h i d', attn, v)
         out = rearrange(out, 'b h (x y) d -> b (h d) x y', x = h, y = w)
         return self.to_out(out)
@@ -95,7 +92,6 @@ class Transformer(nn.Module):
         pos_emb = self.pos_emb[:(h * w)]
         pos_emb = rearrange(pos_emb, '(h w) -> () () h w', h=h, w=w)
         x = x + pos_emb
-
         for attn, ff in self.layers:
             x = attn(x) + x
             x = ff(x) + x

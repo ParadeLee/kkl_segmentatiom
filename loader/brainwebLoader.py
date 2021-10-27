@@ -16,7 +16,7 @@ class brainwebLoader(data.Dataset):
     def __init__(self, root, split="train"):
     # def __init__(self, split="train"):
         # root = '/data/home/ywen/lk/datasets/brainweb/'
-        root = 'datasets/brainweb/'
+        # root = 'datasets/brainweb/'
         self.root = root
         self.split = split
         self.n_classes = 4
@@ -119,7 +119,7 @@ class brainwebLoader(data.Dataset):
 
 
 def debug_load():
-    root = 'datasets/brainweb/'
+    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/brainweb/'
     t_loader = brainwebLoader(
         root,
 		split='trainval')
@@ -136,7 +136,7 @@ def debug_load():
 
         labels = np.squeeze(labels.data.numpy())
         decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('trained_models/brainweb', '{}.bmp'.format(img_name[0])), decoded)
+        m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/brainweb/', '{}.bmp'.format(img_name[0])), decoded)
         print('.')
 
         # tensor2numpy
