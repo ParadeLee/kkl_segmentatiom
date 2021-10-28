@@ -104,10 +104,10 @@ class DoubleConv(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(in_dim, out_dim, 3, padding=1),
             nn.BatchNorm2d(out_dim),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(inplace=True),
             nn.Conv2d(out_dim, out_dim, 3, padding=1),
             nn.BatchNorm2d(out_dim),
-            nn.ReLU(inplace=True)
+            nn.LeakyReLU(inplace=True)
         )
 
     def forward(self, input):
@@ -193,7 +193,7 @@ class NesTUnet(nn.Module):
         #     nn.ReLU(inplace=True)
         # )
         self.bottom_head = nn.Sequential(
-            LayerNorm(dim),
+            nn.BatchNorm2d(dim),
             # Reduce('b c h w -> b c', 'mean'),
             nn.Conv2d(96, 192, 3, padding=1),
             nn.MaxPool2d(3, stride=2, padding=1)
@@ -206,7 +206,7 @@ class NesTUnet(nn.Module):
 
         # Encoder部分
 
-        for level, (transformer, aggregate) in zip(reversed(range(num_hierarchies)), self.layers):
+        for level, (transformer, aggregate) in zip(reversed(range(num_hierarchies)), self.layers): # [2, 1, 0]
             block_size = 2 ** level
             x = rearrange(x, 'b c (b1 h) (b2 w) -> (b b1 b2) c h w', b1=block_size, b2=block_size)
             x = transformer(x)
@@ -229,7 +229,7 @@ class NesTUnet(nn.Module):
         x = torch.cat([x, skip_connection[0]], dim=1)
         x = self.PatchExpand(x)
         x = self.conv_final(x)
-        out = torch.relu(x)
+        out = nn.LeakyReLU(x)
 
         return out
         # return self.mlp_head(x)
