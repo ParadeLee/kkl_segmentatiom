@@ -79,7 +79,7 @@ class EfficientSelfAttention(nn.Module):
         out = rearrange(out, '(b h) (x y) c -> b (h c) x y', h = heads, x = h, y = w)
         return self.to_out(out)
 
-class MixFeedForward(nn.Module):
+class Enhance_MixFeedForward(nn.Module):
     def __init__(
         self,
         *,
@@ -88,12 +88,18 @@ class MixFeedForward(nn.Module):
     ):
         super().__init__()
         hidden_dim = dim * expansion_factor
-        self.net = nn.Sequential(
-            nn.Conv2d(dim, hidden_dim, 1),
-            DoubleConv(hidden_dim, hidden_dim, 3, padding = 1),
-            nn.GELU(),
-            nn.Conv2d(hidden_dim, dim, 1)
-        )
+        self.conv1 = nn.Conv2d(dim, hidden_dim, 1),
+        self.double_conv = DoubleConv(hidden_dim, hidden_dim, 3, padding=1),
+        self.LN = LayerNorm(hidden_dim)
+        self.conv2 = nn.Conv2d(hidden_dim, dim, 1)
 
     def forward(self, x):
-        return self.net(x)
+        res = x = self.conv1(x)
+        x = self.double_conv(x)
+        x = torch.add(res, x)
+        x = self.LN(x)
+        x = self.conv2(x)
+        return x
+
+
+
