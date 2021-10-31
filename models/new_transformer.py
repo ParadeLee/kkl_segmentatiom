@@ -17,6 +17,29 @@ def cast_tuple(val, depth):
     return val if isinstance(val, tuple) else (val,) * depth
 
 # classes
+# class MLP(nn.Module):
+#     def __int__(self, input_size, out_size):
+#         super().__int__()
+#         self.linear = nn.Sequential(
+#             nn.Linear(input_size, input_size // 2),
+#             nn.ReLU(inplace=True),
+#             nn.Linear(input_size // 2, input_size // 4),
+#             nn.ReLU(inplace=True),
+#             nn.Linear(input_size // 4, out_size),
+#         )
+#
+#     def forward(self, x):
+#         out = self.linear(x)
+#         return out
+
+class projection(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.proj = nn.Sequential(
+            nn.Conv2d(input_dim, output_dim)
+        )
+
+
 class LayerNorm(nn.Module):
     def __init__(self, dim, eps = 1e-5):
         super().__init__()
@@ -168,7 +191,7 @@ class UTEncoder(nn.Module):
                 overlap_patch_embed,
                 layers
             ]))
-
+            
     def forward(self, x):
         h, w = x.shape[-2:]
         layer_connected = []
@@ -201,6 +224,8 @@ class UTDecoder(nn.Module):
         # layer_connection
         self.token = []
         self.token = layer_connected
+
+
         self.layers = nn.ModuleList([])
         dims = 256
         for _ in range(num_layers):
@@ -211,6 +236,7 @@ class UTDecoder(nn.Module):
 
 
     def forward(self, x):
+
         return x
 
 
