@@ -17,7 +17,7 @@ from utils import get_logger
 from metrics import runningScore, averageMeter
 from schedulers import get_scheduler
 from optimizers import get_optimizer
-from models.NsetUnet import *
+from models.segformer_pytorch import *
 
 def train(cfg, logger):
 
@@ -66,10 +66,9 @@ def train(cfg, logger):
     # Setup Metrics
     running_metrics_val = runningScore(n_classes, n_val)
 
-    # Setup Model
+    # Setup Model,载入模型
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = NesTUnet(image_size=224, patch_size=4, num_classes=4, dim=96, heads=3, num_hierarchies=3, block_repeats=(2, 2, 8),
-                       mlp_mult=4, channels=3, dim_head=64, dropout=0.).to(device)
+    model = Segformer().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 

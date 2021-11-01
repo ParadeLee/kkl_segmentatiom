@@ -116,7 +116,8 @@ class MiT(nn.Module):
 
         self.stages = nn.ModuleList([])
 
-        for (dim_in, dim_out), (kernel, stride, padding), num_layers, ff_expansion, heads, reduction_ratio in zip(dim_pairs, stage_kernel_stride_pad, num_layers, ff_expansion, heads, reduction_ratio):
+        for (dim_in, dim_out), (kernel, stride, padding), num_layers, ff_expansion, heads, reduction_ratio in \
+                zip(dim_pairs, stage_kernel_stride_pad, num_layers, ff_expansion, heads, reduction_ratio):
             get_overlap_patches = nn.Unfold(kernel, stride = stride, padding = padding)
             overlap_patch_embed = nn.Conv2d(dim_in * kernel ** 2, dim_out, 1)
 
@@ -173,8 +174,10 @@ class Segformer(nn.Module):
         num_classes = 4
     ):
         super().__init__()
-        dims, heads, ff_expansion, reduction_ratio, num_layers = map(partial(cast_tuple, depth = 4), (dims, heads, ff_expansion, reduction_ratio, num_layers))
-        assert all([*map(lambda t: len(t) == 4, (dims, heads, ff_expansion, reduction_ratio, num_layers))]), 'only four stages are allowed, all keyword arguments must be either a single value or a tuple of 4 values'
+        dims, heads, ff_expansion, reduction_ratio, num_layers = \
+            map(partial(cast_tuple, depth = 4), (dims, heads, ff_expansion, reduction_ratio, num_layers))
+        assert all([*map(lambda t: len(t) == 4, (dims, heads, ff_expansion, reduction_ratio, num_layers))]), \
+            'only four stages are allowed, all keyword arguments must be either a single value or a tuple of 4 values'
 
         self.mit = MiT(
             channels = channels,

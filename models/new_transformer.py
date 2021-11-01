@@ -16,22 +16,6 @@ def exists(val):
 def cast_tuple(val, depth):
     return val if isinstance(val, tuple) else (val,) * depth
 
-# classes
-# class MLP(nn.Module):
-#     def __int__(self, input_size, out_size):
-#         super().__int__()
-#         self.linear = nn.Sequential(
-#             nn.Linear(input_size, input_size // 2),
-#             nn.ReLU(inplace=True),
-#             nn.Linear(input_size // 2, input_size // 4),
-#             nn.ReLU(inplace=True),
-#             nn.Linear(input_size // 4, out_size),
-#         )
-#
-#     def forward(self, x):
-#         out = self.linear(x)
-#         return out
-
 class projection(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
@@ -76,6 +60,7 @@ class DoubleConv(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+
 class EfficientSelfAttention(nn.Module):
     def __init__(
         self,
@@ -96,7 +81,7 @@ class EfficientSelfAttention(nn.Module):
         h, w = x.shape[-2:]
         heads = self.heads
 
-        q, k, v = (self.to_q(x), *self.to_kv(x).chunk(2, dim = 1))
+        q, k, v = (self.to_q(x), *self.to_kv(x).chunk(2, dim=1))
         q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h = heads), (q, k, v))
 
         sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
@@ -106,7 +91,7 @@ class EfficientSelfAttention(nn.Module):
         out = rearrange(out, '(b h) (x y) c -> b (h c) x y', h = heads, x = h, y = w)
         return self.to_out(out)
 
-class Enhance_MixFeedForward(nn.Module):
+class Enhance_MixFeedForward(nn.Module): # 1层
     def __init__(
         self,
         *,
@@ -115,17 +100,30 @@ class Enhance_MixFeedForward(nn.Module):
     ):
         super().__init__()
         hidden_dim = dim * expansion_factor
-        self.conv1 = nn.Conv2d(dim, hidden_dim, 1),
-        self.double_conv = DoubleConv(hidden_dim, hidden_dim, 3, padding=1),
-        self.LN = LayerNorm(hidden_dim)
-        self.conv2 = nn.Conv2d(hidden_dim, dim, 1)
+        self.layers = nn.ModuleList([
+            nn.Conv2d(dim, hidden_dim, 1),
+            DoubleConv(hidden_dim, hidden_dim, 3, padding=1),
+            LayerNorm(hidden_dim),
+            nn.Conv2d(hidden_dim, dim, 1)
+        ])
+
+        # self.conv1 = nn.Conv2d(dim, hidden_dim, 1),
+        # self.double_conv = DoubleConv(hidden_dim, hidden_dim, 3, padding=1),
+        # self.LN = LayerNorm(hidden_dim)
+        # self.conv2 = nn.Conv2d(hidden_dim, dim, 1)
 
     def forward(self, x):
-        res = x = self.conv1(x)
-        x = self.double_conv(x)
+        res = x = self.layers[0](x)
+        x = self.layers[1](x)
         x = torch.add(res, x)
-        x = self.LN(x)
-        x = self.conv2(x)
+        x = self.layers[2](x)
+        x = self.layers[3](x)
+        # x = self.conv1(x)
+        # res = x
+        # x = self.double_conv(x)
+        # x = torch.add(res, x)
+        # x = self.LN(x)
+        # x = self.conv2(x)
         return x
 
 
@@ -134,7 +132,7 @@ class Enhance_MixFeedForward(nn.Module):
 #         super(self).__init__()
 
 #  上采样
-class PatchExpand(nn.module):
+class PatchExpand(nn.Module):
     def __init__(
             self,
             input_resolution, # [img_size[0]//patch_size[0], img_size[1]//patch_size[1]]
@@ -158,6 +156,8 @@ class PatchExpand(nn.module):
         x = rearrange(x, 'b h w (p1 p2 c) -> b (h p1) (w p2) c', p1=2, p2=2, c=C//4)
         x = x.view(B, -1, C//4)
         x = self.norm(x)
+
+        return x
 
 
 class UTEncoder(nn.Module):
@@ -207,12 +207,13 @@ class UTEncoder(nn.Module):
             x = rearrange(x, 'b c (h w) -> b c h w', h=h//ratio)
 
             x = overlap_embed(x)
+            # patch merging
             for (attn, ff) in layers:
                 x = attn(x) + x
                 x = ff(x) + x
             layer_connected.append(x)
 
-        return x, layer_connected
+        return layer_connected
 
 class UTDecoder(nn.Module):
     def __init__(
@@ -221,74 +222,118 @@ class UTDecoder(nn.Module):
             heads,
             ff_expansion,
             reduction_ratio,  # (8, 4, 2, 1)
-            num_layers,
-            layer_connected,
+            num_connected_layers, # 4
+            decoder_dim,
+            num_classes,
     ):
         super().__init__()
         # layer_connection
-        self.layer_connected = layer_connected
-        proj_dim = list(zip(32, 64, 160, 256))
-
-
+        proj_dim = dims  # (32, 64, 160, 256)
+        fix_dims = 160
+        self.proj_norm = LayerNorm(fix_dims)
+        # self.LN = LayerNorm()
+        self.connected_proj1 = nn.Sequential(
+            projection(proj_dim[0], fix_dims),
+            nn.ReLU(inplace=True),
+        )
+        self.connected_proj2 = nn.Sequential(
+            projection(proj_dim[1], fix_dims),
+            nn.ReLU(inplace=True),
+        )
+        self.connected_proj3 = nn.Sequential(
+            projection(proj_dim[2], fix_dims),
+            nn.ReLU(inplace=True),
+        )
+        self.connected_proj4 = nn.Sequential(
+            projection(proj_dim[3], fix_dims),
+            nn.ReLU(inplace=True),
+        )
         self.layers = nn.ModuleList([])
-        dims = 256
-        for _ in range(num_layers):
+        for _ in range(num_connected_layers):
             self.layers.append(nn.ModuleList([
-                PreNorm(dims, EfficientSelfAttention(dim=dims, heads=heads, reduction_ratio=reduction_ratio)),
-                PreNorm(dims, Enhance_MixFeedForward(dim=dims, expansion_factor=ff_expansion)),
+                PreNorm(fix_dims, EfficientSelfAttention(dim=fix_dims, heads=5, reduction_ratio=reduction_ratio)),
+                PreNorm(fix_dims, Enhance_MixFeedForward(dim=fix_dims, expansion_factor=ff_expansion[_])),
             ]))
 
+        final_dims = () #
+        self.to_fused = nn.ModuleList([nn.Sequential(
+            nn.Conv2d(final_dims, decoder_dim, 1),
+            nn.Upsample(scale_factor=2 ** i)
+        ) for i, final_dims in enumerate(final_dims)])
 
-    def forward(self, x):
-        token = []
-        token = self.layer_connected
+        # MLP层输出
+        self.to_segmentation = nn.Sequential(
+            nn.Conv2d(4 * decoder_dim, decoder_dim, 1),
+            nn.Conv2d(decoder_dim, num_classes, 1),
+        )
+
+    def forward(self, x):  # 传入encoder的输出
+        token = x
+        token[0] = self.connected_proj1(token[0])
+        token[1] = self.connected_proj2(token[1])
+        token[2] = self.connected_proj3(token[2])
+        token[3] = self.connected_proj4(token[3])
+
+        merge_token = torch.cat((token[0], token[1], token[2], token[3]), dim=1)
+        for (attn, ff) in self.layers:
+            res_token = self.proj_norm(attn(self.proj_norm(merge_token)) + merge_token)
+            split_token = torch.split(res_token, (160, 160, 160, 160), dim=1)
+            ffn1 = ff(split_token[0])
+            ffn2 = ff(split_token[1])
+            ffn3 = ff(split_token[2])
+            ffn4 = ff(split_token[3])
+            merge_token = torch.cat((ffn1, ffn2, ffn3, ffn4), dim=1) + res_token
+        decoder_token = torch.split(merge_token, (160, 160, 160, 160), dim=1)
+
+        output = [torch.cat((a, b), dim=1) for a, b in zip(decoder_token, x)]
+        fused = [to_fused(output) for output, to_fused in zip(output, self.to_fused)]
+        fused = torch.cat(fused, dim=1)
+        return self.to_segmentation(fused)
 
 
-        return x
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-class kiuT(nn.Module):
+class Enhance_segfomer(nn.Module):
     def __init__(
             self,
             *,
-            channels,
-            dims, # (32, 64, 160, 256)
-            heads,
-            ff_expansion,
-            reduction_ratio,
-            # num_layers = 2
+            dims=(32, 64, 160, 256),
+            heads=(1, 2, 5, 8),
+            ff_expansion=(8, 8, 4, 4),
+            reduction_ratio=(8, 4, 2, 1),
+            num_layers=2,
+            channels=3,
+            decoder_dim=256,
+            num_classes=4,
     ):
         super().__init__()
-        dims = (channels, *dims) # (3, 32, 64, 160, 256)
-        dim_in, dim_out = []
-        dim_in = dims[:-1]
-        dim_out = dims[1:]
-        kernel = [7, 3, 3, 3]
-        self.OverlapPatchEmbedding = nn.Sequential(
-            nn.Unfold(kernel[0], stride=4, padding=3),
-            nn.Conv2d(dim_in[0] * kernel[0] ** 2, dim_out[0], 1),
+        dims, heads, ff_expansion, reduction_ratio, num_layers = \
+            map(partial(cast_tuple, depth=4), (dims, heads, ff_expansion, reduction_ratio, num_layers))
+        assert all([*map(lambda t: len(t) == 4, (dims, heads, ff_expansion, reduction_ratio, num_layers))]), \
+            'only four stages are allowed, all keyword arguments must be either a single value or a tuple of 4 values'
+
+        self.encoder = UTEncoder(
+            channels=channels,
+            dims=dims,
+            heads=heads,
+            ff_expansion=ff_expansion,
+            reduction_ratio=reduction_ratio,
+            num_layers=num_layers,
         )
-        # get_overlap_patches = nn.Unfold(kernel[0], stride=4, padding=3)
-        # overlap_patch_embed = nn.Conv2d(dim_in[0] * kernel[0] ** 2, dim_out[0], 1)
-        self.Attention1 = nn.Sequential(
-            PreNorm(dim_out[0], EfficientSelfAttention(dim=dim_out[0], heads= heads, reduction_ratio=reduction_ratio)),
-            PreNorm(dim_out[0], Enhance_MixFeedForward(dim=dim_out[0], expansion_factor=ff_expansion)),
+
+        self.decoder = UTDecoder(
+            dims=dims,
+            heads=heads,
+            ff_expansion=ff_expansion,
+            reduction_ratio=reduction_ratio,  # (8, 4, 2, 1)
+            num_connected_layers=4,  # 4
+            decoder_dim=decoder_dim,
+            num_classes=num_classes,
         )
+
+    def forward(self, x):
+        x = self.encoder(x)
+        output = self.decoder(x)
+        return output
+
+
 
 
