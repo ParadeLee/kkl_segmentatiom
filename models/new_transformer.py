@@ -36,8 +36,12 @@ class projection(nn.Module):
     def __init__(self, input_dim, output_dim):
         super().__init__()
         self.proj = nn.Sequential(
-            nn.Conv2d(input_dim, output_dim)
+            nn.Conv2d(input_dim, output_dim, 1, bias=False),
+            nn.ReLU(inplace=True),
         )
+    def forward(self, x):
+        x = self.proj(x)
+        return x
 
 
 class LayerNorm(nn.Module):
@@ -84,9 +88,9 @@ class EfficientSelfAttention(nn.Module):
         self.scale = (dim // heads) ** -0.5
         self.heads = heads
 
-        self.to_q = nn.Conv2d(dim, dim, 1, bias = False)
-        self.to_kv = nn.Conv2d(dim, dim * 2, reduction_ratio, stride = reduction_ratio, bias = False)
-        self.to_out = nn.Conv2d(dim, dim, 1, bias = False)
+        self.to_q = nn.Conv2d(dim, dim, 1, bias=False)
+        self.to_kv = nn.Conv2d(dim, dim * 2, reduction_ratio, stride=reduction_ratio, bias = False)
+        self.to_out = nn.Conv2d(dim, dim, 1, bias=False)
 
     def forward(self, x):
         h, w = x.shape[-2:]
@@ -222,8 +226,8 @@ class UTDecoder(nn.Module):
     ):
         super().__init__()
         # layer_connection
-        self.token = []
-        self.token = layer_connected
+        self.layer_connected = layer_connected
+        proj_dim = list(zip(32, 64, 160, 256))
 
 
         self.layers = nn.ModuleList([])
@@ -236,6 +240,9 @@ class UTDecoder(nn.Module):
 
 
     def forward(self, x):
+        token = []
+        token = self.layer_connected
+
 
         return x
 
