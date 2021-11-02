@@ -113,11 +113,11 @@ def train(cfg, logger):
     #     data_path,
     #     split=cfg["data"]["test_split"],
     # )
-    # test data
+    # testcode data
 
     n_classes = t_loader.n_classes
     n_val = len(v_loader.files['val'])
-    # n_test = len(e_loader.files['test'])
+    # n_test = len(e_loader.files['testcode'])
     # tf_train = JointTransform2D(crop=None, p_flip=0.5, color_jitter_params=None, long_mask=True)
     # tf_val = JointTransform2D(crop=None, p_flip=0, color_jitter_params=None, long_mask=True)
     # train_dataset = ImageToImage2D(t_loader, tf_train)

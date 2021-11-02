@@ -15,7 +15,7 @@ class brainwebLoader(data.Dataset):
 
     def __init__(self, root, split="train"):
     # def __init__(self, split="train"):
-        # root = '/data/home/ywen/lk/datasets/brainweb/'
+        root = '/data/home/ywen/lk/datasets/brainweb/'
         # root = 'datasets/brainweb/'
         self.root = root
         self.split = split

@@ -33,7 +33,6 @@ class runningScore(object):
             - Dice (DSC): dice = 2*TP/(TP+FP+TP+FN)
             - Pixel Accuracy (PA)
 		"""
-
         hist = self.confusion_matrix
         acc = np.diag(hist).sum() / hist.sum()
         iu = np.diag(hist) / (hist.sum(axis=1) + hist.sum(axis=0) - np.diag(hist))
@@ -64,13 +63,11 @@ class averageMeter(object):
 
     def __init__(self):
         self.reset()
-
     def reset(self):
         self.val = 0
         self.avg = 0
         self.sum = 0
         self.count = 0
-
     def update(self, val, n=1):
         self.val = val
         self.sum += val * n

@@ -203,7 +203,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/train_dataset.yml",
+        default="configs/segformer_mrbrains.yml",
         help="Configuration file to use",
     )
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         cfg = yaml.load(fp)
 
     run_id = random.randint(1, 100000)
-    logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))
+    logdir = os.path.join("../runs", os.path.basename(args.config)[:-4], str(run_id))
     if not os.path.exists(logdir): os.makedirs(logdir)
 
     print("RUNDIR: {}".format(logdir))

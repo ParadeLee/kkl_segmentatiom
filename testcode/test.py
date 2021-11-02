@@ -94,7 +94,7 @@ def boxplotvis(cfg):
     n_classes = v_loader.n_classes
     n_val = len(v_loader.files['val'])
 
-    # test differnet models' prediction
+    # testcode differnet models' prediction
     vgg16lstm_metric = runningScore(n_classes, n_val)
     vgg16gru_metric = runningScore(n_classes, n_val)
     segnet_metric = runningScore(n_classes, n_val)

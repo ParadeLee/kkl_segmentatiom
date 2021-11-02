@@ -13,7 +13,7 @@ from torchvision import transforms
 class mrbrainsLoader(data.Dataset):
 
     def __init__(self, root, split="train"):
-        root = 'datasets/mrbrains/'
+        # root = 'datasets/mrbrains/'
         self.root = root
         self.split = split
         self.n_classes = 4
@@ -124,7 +124,7 @@ class mrbrainsLoader(data.Dataset):
 
 
 def debug_load():
-    root = '../RDC/datasets/mrbrains/'
+    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/mrbrains/'
 
     t_loader = mrbrainsLoader(
         root,
@@ -142,7 +142,7 @@ def debug_load():
 
         labels = np.squeeze(labels.data.numpy())
         decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('../result_image_when_training/mrbrains', '{}.bmp'.format(img_name[0])), decoded)
+        m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/mrbrains/', '{}.bmp'.format(img_name[0])), decoded)
         print('.')
 
         # tensor2numpy
