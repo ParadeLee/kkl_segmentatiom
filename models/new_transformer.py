@@ -7,6 +7,13 @@ import torch.nn.functional as F
 from einops import rearrange, reduce
 from einops.layers.torch import Rearrange
 
+class WindowCrossAttention(nn.Module):
+    def __init__(self, dim, window_size, num_heads, qkv_bias=True, qk_scale=None, attn_drop=0., proj_drop=0.):
+        super().__init__()
+        self.qkv = nn.Linear(dim, dim*3, bias=qkv_bias)
+    def forward(self, x, mask_all=None):
+        B, nH, nW, C = x.shape
+        qkv = self.qkv(x).reshape(B, nH, nW, 3, C).permute(3, 0, 1, 2, 4).contiguous()
 
 # helps
 
@@ -205,6 +212,7 @@ class PatchExpand(nn.Module):
         return x
 
 
+
 class UTEncoder(nn.Module):
     def __init__(
             self,
@@ -321,7 +329,7 @@ class UTDecoder(nn.Module):
 
         merge_token = torch.cat((token[0], token[1], token[2], token[3]), dim=1)
         for (attn, ff) in self.layers:
-            res_token = self.proj_norm(attn(self.proj_norm(merge_token)) + merge_token)
+            res_token = self.proj_norm(attn(self.proj_norm(merge_token),  ) + merge_token)
             split_token = torch.split(res_token, (160, 160, 160, 160), dim=1)
             ffn1 = ff(split_token[0])
             ffn2 = ff(split_token[1])

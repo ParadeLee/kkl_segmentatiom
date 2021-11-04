@@ -162,6 +162,7 @@ def get_roll_masks(H, W, window_size, shift_size):
     return attn_mask_all
 
 def get_relative_position_index(q_windows, k_windows):
+    # 生成网格
     """
     Args:
         q_windows: tuple (query_window_height, query_window_width)
@@ -619,6 +620,8 @@ class FocalTransformerBlock(nn.Module):
 
         if self.shift_size > 0:
             shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+            # torch.roll(input, shifts, dims=None)->Tensor
+            # 沿给定维数滚动张量，移动到最后一个位置以外的元素将在第一个位置重新引入。第0维度向下移，第1维向右移。
         else:
             shifted_x = x
 
@@ -1135,25 +1138,25 @@ class FocalTransformer(nn.Module):
         return flops
 
 
-def profile(model, inputs):
-    from torch.profiler import profile, record_function, ProfilerActivity
-    with profile(activities=[
-        ProfilerActivity.CPU, ProfilerActivity.CUDA], with_stack=True, record_shapes=True) as prof:
-        with record_function("model_inference"):
-            model(inputs)
-
-    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
+# def profile(model, inputs):
+#     from torch.profiler import profile, record_function, ProfilerActivity
+#     with profile(activities=[
+#         ProfilerActivity.CPU, ProfilerActivity.CUDA], with_stack=True, record_shapes=True) as prof:
+#         with record_function("model_inference"):
+#             model(inputs)
+#
+#     print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=15))
 
 
 if __name__ == '__main__':
     img_size = 224
-    x = torch.rand(16, 3, img_size, img_size).cuda()
+    x = torch.rand(16, 3, img_size, img_size).cpu()
     model = FocalTransformer(img_size=img_size, embed_dim=128, depths=[2, 2, 18, 2], drop_path_rate=0.2,
                              focal_levels=[2, 2, 2, 2], expand_sizes=[3, 3, 3, 3], expand_layer="all",
                              num_heads=[4, 8, 16, 32],
                              focal_windows=[7, 5, 3, 1], window_size=7,
                              use_conv_embed=False, use_shift=False,
-                             ).cuda()
+                             ).cpu()
 
     model.eval()
 
@@ -1163,4 +1166,4 @@ if __name__ == '__main__':
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"number of params: {n_parameters}")
 
-    profile(model, x)
+    # profile(model, x)

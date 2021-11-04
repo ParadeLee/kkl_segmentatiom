@@ -180,12 +180,12 @@ class Segformer(nn.Module):
             'only four stages are allowed, all keyword arguments must be either a single value or a tuple of 4 values'
 
         self.mit = MiT(
-            channels = channels,
-            dims = dims,
-            heads = heads,
-            ff_expansion = ff_expansion,
-            reduction_ratio = reduction_ratio,
-            num_layers = num_layers
+            channels=channels,
+            dims=dims,
+            heads=heads,
+            ff_expansion=ff_expansion,
+            reduction_ratio=reduction_ratio,
+            num_layers=num_layers
         )
 
         self.to_fused = nn.ModuleList([nn.Sequential(
