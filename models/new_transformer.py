@@ -11,9 +11,11 @@ class WindowCrossAttention(nn.Module):
     def __init__(self, dim, window_size, num_heads, qkv_bias=True, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
         self.qkv = nn.Linear(dim, dim*3, bias=qkv_bias)
-    def forward(self, x, mask_all=None):
+    def forward(self, x, x_all, mask_all=None):
         B, nH, nW, C = x.shape
         qkv = self.qkv(x).reshape(B, nH, nW, 3, C).permute(3, 0, 1, 2, 4).contiguous()
+        q, k, v = qkv[0], qkv[1], qkv[2]  # B, nH, nW, C
+
 
 # helps
 
@@ -44,7 +46,7 @@ class LayerNorm(nn.Module):
 
     def forward(self, x):
         std = torch.var(x, dim = 1, unbiased = False, keepdim = True).sqrt()
-        mean = torch.mean(x, dim = 1, keepdim = True)
+        mean = torch.mean(x, dim = 1, keepdim=True)
         return (x - mean) / (std + self.eps) * self.g + self.b
 
 class PreNorm(nn.Module):

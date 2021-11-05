@@ -320,7 +320,7 @@ class WindowAttention(nn.Module):
         (q_windows, k_windows, v_windows) = map(
             lambda t: window_partition(t, self.window_size[0]).view(
                 -1, self.window_size[0] * self.window_size[0], self.num_heads, C // self.num_heads
-            ).transpose(1, 2),
+            ).transpose(1, 2),  # 交换12两个维度
             (q, k, v)
         )
 
@@ -366,7 +366,7 @@ class WindowAttention(nn.Module):
             for k in range(self.focal_level - 1):
                 stride = 2 ** k
                 x_window_pooled = x_all[k + 1]  # B, nWh, nWw, C
-                nWh, nWw = x_window_pooled.shape[1:3]
+                nWh, nWw = x_window_pooled.shape[1:3]  # 第一维和第二维
 
                 # generate mask for pooled windows
                 mask = x_window_pooled.new(nWh, nWw).fill_(1)
