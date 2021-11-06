@@ -10,11 +10,24 @@ from einops.layers.torch import Rearrange
 class WindowCrossAttention(nn.Module):
     def __init__(self, dim, window_size, num_heads, qkv_bias=True, qk_scale=None, attn_drop=0., proj_drop=0.):
         super().__init__()
+        self.dim = dim
+        self.window_size = window_size
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = qk_scale or head_dim ** -0.5
+
         self.qkv = nn.Linear(dim, dim*3, bias=qkv_bias)
+
+
     def forward(self, x, x_all, mask_all=None):
         B, nH, nW, C = x.shape
         qkv = self.qkv(x).reshape(B, nH, nW, 3, C).permute(3, 0, 1, 2, 4).contiguous()
         q, k, v = qkv[0], qkv[1], qkv[2]  # B, nH, nW, C
+
+        q = q * self.scale
+        attn = (q @ k.transpose(-2, -1))
+
+
 
 
 # helps
