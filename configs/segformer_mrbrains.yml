@@ -1,5 +1,5 @@
 model:
-    arch: NestUnet
+    arch: UCTransNet
 data:
     dataset: MRBrainS
     train_split: train
@@ -21,7 +21,7 @@ training:
         name: 'cross_entropy'
     lr_schedule:
     resume:
-    model_dir: trained_models/Segformer
+    model_dir: trained_models/UCTransNet
 
 testing:
     trained_model: trained_models/NesTUnet/NestUnet_BrainWeb.pkl

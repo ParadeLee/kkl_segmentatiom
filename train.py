@@ -17,7 +17,7 @@ from utils import get_logger
 from metrics import runningScore, averageMeter
 from schedulers import get_scheduler
 from optimizers import get_optimizer
-from models.segformer_pytorch import *
+from models.UCTransNet import *
 
 def train(cfg, logger):
 
@@ -68,7 +68,7 @@ def train(cfg, logger):
 
     # Setup Model,载入模型
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = Segformer().to(device)
+    model = UCTransNet().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         cfg = yaml.load(fp)
 
     run_id = random.randint(1, 100000)
-    logdir = os.path.join("../runs", os.path.basename(args.config)[:-4], str(run_id))
+    logdir = os.path.join("runs", os.path.basename(args.config)[:-4], str(run_id))
     if not os.path.exists(logdir): os.makedirs(logdir)
 
     print("RUNDIR: {}".format(logdir))

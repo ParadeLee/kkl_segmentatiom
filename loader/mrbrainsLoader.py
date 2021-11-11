@@ -14,6 +14,7 @@ class mrbrainsLoader(data.Dataset):
 
     def __init__(self, root, split="train"):
         # root = 'datasets/mrbrains/'
+        root = '/data/home/ywen/lk/datasets/mrbrains/'
         self.root = root
         self.split = split
         self.n_classes = 4
@@ -53,7 +54,7 @@ class mrbrainsLoader(data.Dataset):
         
         #self.draw(lbl)
         #sys.exit(0)
-        newsize = 256
+        newsize = 224
         t1 = m.imresize(t1,[newsize,newsize], interp='bilinear', mode=None)
         t2 = m.imresize(t2,[newsize,newsize], interp='bilinear', mode=None)
         pd = m.imresize(pd,[newsize,newsize], interp='bilinear', mode=None)
