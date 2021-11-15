@@ -1,18 +1,18 @@
 model:
     arch: UCTransNet
 data:
-    dataset: MRBrainS
+    dataset: HVSMR
     train_split: train
     val_split: val
-    path: datasets/mrbrains/
+    path: datasets/hvsmr2016/
 
 training:
     gpu_idx: 0
-    train_iters: 3000
+    train_iters: 30000
     batch_size: 1
-    val_interval: 100
+    val_interval: 500
     n_workers: 4
-    print_interval: 50
+    print_interval: 100
     optimizer:
         name: 'adam'
         lr: 6.0e-4

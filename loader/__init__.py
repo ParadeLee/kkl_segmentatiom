@@ -1,6 +1,6 @@
 from loader.brainwebLoader import brainwebLoader
 from loader.mrbrainsLoader import mrbrainsLoader
-
+from loader.hvsmrLoader import hvsmrLoader
 
 def get_loader(name):
     """get_loader
@@ -11,5 +11,5 @@ def get_loader(name):
         "MRBrainS": mrbrainsLoader,
         # "Brats": BratsLoader,
 		# 'Hyper': hyperLoader,
-        # "HVSMR": hvsmrLoader
+        "HVSMR": hvsmrLoader
     }[name]

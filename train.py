@@ -203,7 +203,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/segformer_mrbrains.yml",
+        default="configs/UCTransNet.yml",
         help="Configuration file to use",
     )
 
