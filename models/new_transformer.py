@@ -323,7 +323,7 @@ class UTDecoder(nn.Module):
                 PreNorm(fix_dims, Enhance_MixFeedForward(dim=fix_dims, expansion_factor=ff_expansion[_])),
             ]))
 
-        final_dims = () #
+        final_dims = ()
         self.to_fused = nn.ModuleList([nn.Sequential(
             nn.Conv2d(final_dims, decoder_dim, 1),
             nn.Upsample(scale_factor=2 ** i)
