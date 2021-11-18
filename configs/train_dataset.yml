@@ -1,14 +1,14 @@
 model:
     arch: NestUnet
 data:
-    dataset: MRBrainS
+    dataset: HVSMR
     train_split: train
     val_split: val
-    path: datasets/mrbrains/
+    path: datasets/hvsmr2016/
 
 training:
     gpu_idx: 0
-    train_iters: 3000
+    train_iters: 10000
     batch_size: 1
     val_interval: 100
     n_workers: 4

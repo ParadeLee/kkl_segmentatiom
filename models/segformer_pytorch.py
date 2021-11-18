@@ -18,7 +18,7 @@ def cast_tuple(val, depth):
 # classes
 
 class DsConv2d(nn.Module):
-    def __init__(self, dim_in, dim_out, kernel_size, padding, stride = 1, bias = True):
+    def __init__(self, dim_in, dim_out, kernel_size, padding, stride=1, bias=True):
         super().__init__()
         self.net = nn.Sequential(
             nn.Conv2d(dim_in, dim_in, kernel_size = kernel_size, padding = padding, groups = dim_in, stride = stride, bias = bias),
@@ -175,7 +175,7 @@ class Segformer(nn.Module):
     ):
         super().__init__()
         dims, heads, ff_expansion, reduction_ratio, num_layers = \
-            map(partial(cast_tuple, depth = 4), (dims, heads, ff_expansion, reduction_ratio, num_layers))
+            map(partial(cast_tuple, depth=4), (dims, heads, ff_expansion, reduction_ratio, num_layers))
         assert all([*map(lambda t: len(t) == 4, (dims, heads, ff_expansion, reduction_ratio, num_layers))]), \
             'only four stages are allowed, all keyword arguments must be either a single value or a tuple of 4 values'
 
@@ -194,9 +194,9 @@ class Segformer(nn.Module):
         ) for i, dim in enumerate(dims)])
 
         self.to_segmentation = nn.Sequential(
-            nn.Conv2d(4 * decoder_dim, decoder_dim, 1),
+            nn.Conv2d(4 * decoder_dim, 2 * decoder_dim, 1),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-            nn.Conv2d(decoder_dim, decoder_dim, 1),
+            nn.Conv2d(2 * decoder_dim, decoder_dim, 1),
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
             nn.Conv2d(decoder_dim, num_classes, 1),
         )

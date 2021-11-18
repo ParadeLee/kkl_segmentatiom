@@ -203,7 +203,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/UCTransNet.yml",
+        default="configs/train_dataset.yml",
         help="Configuration file to use",
     )
 

@@ -1,11 +1,9 @@
 import yaml
-import torch
 import argparse
 import numpy as np
 import seaborn as sns
 import scipy.misc as m
 from torch.utils import data
-from models import get_model
 from loader import get_loader
 from utils import convert_state_dict
 from metrics import runningScore
@@ -13,7 +11,7 @@ from tqdm import tqdm
 from os.path import join as pjoin
 import matplotlib.pyplot as plt
 import pandas as pd
-from models.NsetUnet import *
+from kkl_segmentatiom.badmodels.NsetUnet import *
 
 def test(cfg):
 
