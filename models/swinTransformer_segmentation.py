@@ -12,9 +12,9 @@ import torch.utils.checkpoint as checkpoint
 import numpy as np
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
 
-from mmcv_custom import load_checkpoint
-from mmseg.utils import get_root_logger
-from ..builder import BACKBONES
+# from mmcv_custom import load_checkpoint
+# from mmseg.utils import get_root_logger
+# from ..builder import BACKBONES
 
 
 class Mlp(nn.Module):
@@ -445,7 +445,7 @@ class PatchEmbed(nn.Module):
         return x
 
 
-@BACKBONES.register_module()
+# @BACKBONES.register_module()
 class SwinTransformer(nn.Module):
     """ Swin Transformer backbone.
         A PyTorch impl of : `Swin Transformer: Hierarchical Vision Transformer using Shifted Windows`  -
@@ -588,14 +588,14 @@ class SwinTransformer(nn.Module):
                 nn.init.constant_(m.bias, 0)
                 nn.init.constant_(m.weight, 1.0)
 
-        if isinstance(pretrained, str):
-            self.apply(_init_weights)
-            logger = get_root_logger()
-            load_checkpoint(self, pretrained, strict=False, logger=logger)
-        elif pretrained is None:
-            self.apply(_init_weights)
-        else:
-            raise TypeError('pretrained must be a str or None')
+        # if isinstance(pretrained, str):
+        #     self.apply(_init_weights)
+        #     logger = get_root_logger()
+        #     load_checkpoint(self, pretrained, strict=False, logger=logger)
+        # elif pretrained is None:
+        #     self.apply(_init_weights)
+        # else:
+        #     raise TypeError('pretrained must be a str or None')
 
     def forward(self, x):
         """Forward function."""
@@ -624,7 +624,7 @@ class SwinTransformer(nn.Module):
 
         return tuple(outs)
 
-    def train(self, mode=True):
-        """Convert the model into training mode while keep layers freezed."""
-        super(SwinTransformer, self).train(mode)
-        self._freeze_stages()
+    # def train(self, mode=True):
+    #     """Convert the model into training mode while keep layers freezed."""
+    #     super(SwinTransformer, self).train(mode)
+    #     self._freeze_stages()

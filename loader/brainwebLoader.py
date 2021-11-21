@@ -8,13 +8,14 @@ import matplotlib.pyplot as plt
 from torch.utils import data
 import scipy.misc as m
 from torchvision import transforms
+import torch.nn.functional as F
 
 
 class brainwebLoader(data.Dataset):
     """docstring for brainWebLoader"""
 
     def __init__(self, root, split="train"):
-        root = '/data/home/ywen/lk/datasets/brainweb/'
+        # root = '/data/home/ywen/lk/datasets/brainweb/'
         # root = 'datasets/brainweb/'
         self.root = root
         self.split = split
@@ -56,11 +57,21 @@ class brainwebLoader(data.Dataset):
         # pd = m.imread(pd_path)
         # img = np.stack((t1,t2,pd), axis=2)
         lbl = m.imread(lbl_path)
-        # newsize = 224
+        newsize = 224
         # img = m.imresize(img, [newsize, newsize], interp='bilinear', mode=None)
         # lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
 
         img, lbl = self.transform(img, lbl)
+        _, _, H1, W1 = img.size()
+        _, _, H2, W2 = lbl.size()
+        if H1 != newsize:
+            img = F.pad(img, pad=(0, newsize-W1, 0, 0), mode="constant", value=0)
+        if W1 != newsize:
+            img = F.pad(img, pad=(0, 0, 0, newsize-H1), mode="constant", value=0)
+
+        if H2 != newsize:
+            lbl = F.pad(lbl,)
+
 
         return img, lbl, img_name
 
@@ -130,13 +141,14 @@ def debug_load():
 								  num_workers=4,
 								  shuffle=True)
 
-    for (images, labels, img_name) in trainLoader:
-        # m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/imgs/rgb', '{}.bmp'.format(img_name)),images)
-
-        labels = np.squeeze(labels.data.numpy())
-        decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/brainweb/', '{}.bmp'.format(img_name[0])), decoded)
-        print('.')
+#####输出真值
+    # for (images, labels, img_name) in trainLoader:
+    #     # m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/imgs/rgb', '{}.bmp'.format(img_name)),images)
+    #
+    #     labels = np.squeeze(labels.data.numpy())
+    #     decoded = t_loader.decode_segmap(labels, plot=False)
+    #     m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/brainweb/', '{}.bmp'.format(img_name[0])), decoded)
+    #     print('.')
 
         # tensor2numpy
         # print(img_name[0])

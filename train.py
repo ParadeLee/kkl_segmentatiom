@@ -10,6 +10,8 @@ import argparse
 import numpy as np
 from torch.utils import data
 from tqdm import tqdm
+
+from kkl_segmentatiom.models.swinTransformer_segmentation import SwinTransformer
 from models import get_model
 from loss import get_loss_function
 from loader import get_loader
@@ -68,7 +70,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = UCTransNet().to(device)
+    model = SwinTransformer().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
