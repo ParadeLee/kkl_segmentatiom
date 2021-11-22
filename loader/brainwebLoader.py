@@ -62,15 +62,15 @@ class brainwebLoader(data.Dataset):
         # lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
 
         img, lbl = self.transform(img, lbl)
-        _, _, H1, W1 = img.size()
-        _, _, H2, W2 = lbl.size()
-        if H1 != newsize:
-            img = F.pad(img, pad=(0, newsize-W1, 0, 0), mode="constant", value=0)
-        if W1 != newsize:
-            img = F.pad(img, pad=(0, 0, 0, newsize-H1), mode="constant", value=0)
-
-        if H2 != newsize:
-            lbl = F.pad(lbl,)
+        # _, _, H1, W1 = img.size()
+        # _, _, H2, W2 = lbl.size()
+        # if H1 != newsize:
+        #     img = F.pad(img, pad=(0, newsize-W1, 0, 0), mode="constant", value=0)
+        # if W1 != newsize:
+        #     img = F.pad(img, pad=(0, 0, 0, newsize-H1), mode="constant", value=0)
+        #
+        # if H2 != newsize:
+        #     lbl = F.pad(lbl, pad=(0, ))
 
 
         return img, lbl, img_name
