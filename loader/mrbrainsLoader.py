@@ -13,8 +13,6 @@ from torchvision import transforms
 class mrbrainsLoader(data.Dataset):
 
     def __init__(self, root, split="train"):
-        # root = 'datasets/mrbrains/'
-        root = '/data/home/ywen/lk/datasets/mrbrains/'
         self.root = root
         self.split = split
         self.n_classes = 4
@@ -38,7 +36,6 @@ class mrbrainsLoader(data.Dataset):
 
     def __getitem__(self, index):
         img_name = self.files[self.split][index]
-        #img_name = '4t23'
         # img_path = self.root + 'imgs/rgb/' + img_name + '.bmp'
         t1_path = self.root + 'imgs/t1/' + img_name + '.bmp'
         t2_path = self.root + 'imgs/t1ir/' + img_name + '.bmp'
@@ -50,17 +47,9 @@ class mrbrainsLoader(data.Dataset):
         t1 = m.imread(t1_path)
         t2 = m.imread(t2_path)
         pd = m.imread(pd_path)
-        lbl = m.imread(lbl_path)
-        
-        #self.draw(lbl)
-        #sys.exit(0)
-        newsize = 224
-        t1 = m.imresize(t1,[newsize,newsize], interp='bilinear', mode=None)
-        t2 = m.imresize(t2,[newsize,newsize], interp='bilinear', mode=None)
-        pd = m.imresize(pd,[newsize,newsize], interp='bilinear', mode=None)
-        lbl = m.imresize(lbl,[newsize,newsize], interp='bilinear', mode=None)
-        
         img = np.stack((t1,t2,pd), axis=0)
+        lbl = m.imread(lbl_path)
+
         img, lbl = self.transform(img, lbl)
 
         return img, lbl, img_name
@@ -105,11 +94,7 @@ class mrbrainsLoader(data.Dataset):
             plt.show()
         else:
             return rgb.astype(np.uint8)
-    
-    def draw(self, input_data):
-        decoded = self.decode_segmap(input_data)
-        m.imsave(pjoin('./training_vis','{}.bmp'.format('gt')),decoded)
-    
+
     def setup_annotations(self):
         target_path = pjoin(self.root, 'class4')
         if not os.path.exists(target_path): os.makedirs(target_path)
@@ -125,25 +110,25 @@ class mrbrainsLoader(data.Dataset):
 
 
 def debug_load():
-    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/mrbrains/'
+    root = '/home/jwliu/disk/kxie/CNN_LSTM/dataset/mrbrains/'
 
     t_loader = mrbrainsLoader(
-        root,
-        split='trainval')
+		root,
+		split='trainval')
 
     n_classes = t_loader.n_classes
 
     trainLoader = data.DataLoader(t_loader,
-                                  batch_size=1,
-                                  num_workers=4,
-                                  shuffle=True)
+								  batch_size=1,
+								  num_workers=4,
+								  shuffle=True)
 
     for (images, labels, img_name) in trainLoader:
         # m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/imgs/rgb', '{}.bmp'.format(img_name)),images)
 
         labels = np.squeeze(labels.data.numpy())
         decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/mrbrains/', '{}.bmp'.format(img_name[0])), decoded)
+        m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/result_image_when_training/mrbrains', '{}.bmp'.format(img_name[0])), decoded)
         print('.')
 
         # tensor2numpy

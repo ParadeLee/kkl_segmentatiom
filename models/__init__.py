@@ -1,7 +1,7 @@
 import copy
 # from .axialnet import *
 from .CRDN_old import UNetRNN
-from kkl_segmentatiom.badmodels.NsetUnet import *
+
 
 
 def get_model(model_dict, n_classes, version=None):

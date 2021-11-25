@@ -121,38 +121,41 @@ class TRD(nn.Module):
         # ff_expansion=(8, 8, 4, 4), reduction_ratio=(8, 4, 2, 1), heads=(8, 5, 2, 1)
         super().__init__()
         block_kernel_stride_pad = (3, 2, 1)
-        dim_pairs = (ch_in, ch_out)
         self.block = nn.ModuleList([])
-        for (dim_in, dim_out), (kernel, stride, padding) in zip(dim_pairs, block_kernel_stride_pad):
-            get_overlap_patches = nn.Unfold(kernel, stride=stride, padding=padding)
-            expand = nn.Linear(dim_in * (kernel ** 2), 4 * dim_in * (kernel ** 2), bias=False)
-            overlap_patch_embed = nn.Conv2d(dim_in * (kernel ** 2), dim_out, 1)
-            layers_a = nn.ModuleList([])
-            for _ in range(num_layers):
-                layers_a.append(nn.ModuleList([
-                    PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
-                    PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
-                ]))
-            layers_b = nn.ModuleList([])
-            for _ in range(num_layers):
-                layers_b.append(nn.ModuleList([
-                    PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
-                    PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
-                ]))
-            layers_c = nn.ModuleList([])
-            for _ in range(num_layers):
-                layers_c.append(nn.ModuleList([
-                    PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
-                    PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
-                ]))
-            self.block.append(nn.ModuleList([
-                get_overlap_patches,
-                expand,
-                overlap_patch_embed,
-                layers_a,
-                layers_b,
-                layers_c
+        kernel = 3
+        stride = 2
+        padding = 1
+        dim_in = ch_in
+        dim_out = ch_out
+        get_overlap_patches = nn.Unfold(kernel, stride=stride, padding=padding)
+        expand = nn.Linear(dim_in * (kernel ** 2), 4 * dim_in * (kernel ** 2), bias=False)
+        overlap_patch_embed = nn.Conv2d(4 * dim_in * (kernel ** 2), dim_out, 1)
+        layers_a = nn.ModuleList([])
+        for _ in range(num_layers):
+            layers_a.append(nn.ModuleList([
+                PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+                PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
             ]))
+        layers_b = nn.ModuleList([])
+        for _ in range(num_layers):
+            layers_b.append(nn.ModuleList([
+                PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+                PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
+            ]))
+        layers_c = nn.ModuleList([])
+        for _ in range(num_layers):
+            layers_c.append(nn.ModuleList([
+                PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+                PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
+            ]))
+        self.block.append(nn.ModuleList([
+            get_overlap_patches,
+            expand,
+            overlap_patch_embed,
+            layers_a,
+            layers_b,
+            layers_c
+        ]))
     def forward(self, x, h):
         h_up = F.interpolate(h, size=[x.size(2), x.size(3)], mode='bilinear', align_corners=True)
         H, W = x.shape[-2:]
@@ -160,18 +163,22 @@ class TRD(nn.Module):
         for (get_overlap_patches, expand, overlap_embed, layersA, layersB, layersC) in self.block:
             x = get_overlap_patches(x)
             h_up = get_overlap_patches(h_up)
+            print(h_up.size())
+            print(x.size())
             num_patches_x = x.shape[-1]
             num_patches_h_up = h_up.shape[-1]
             ratio_x = int(sqrt((H * W) / num_patches_x))
             ratio_h_up = int(sqrt((H * W) / num_patches_h_up))
-            x = rearrange(x, 'b c (h w) -> b c h w', h=H // ratio_x)
-            h_up = rearrange(x, 'b c (h w) -> b c h w', h=H // ratio_h_up)
-            x = overlap_embed(x)
-            h_up = overlap_embed(h_up)
             x = expand(x)
             h_up = expand(h_up)
-            _, C, _, _ = x.shape
-            x = rearrange(x, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C//4)
+            x = rearrange(x, 'b c (h w) -> b c h w', h=H // ratio_x)
+            h_up = rearrange(h_up, 'b c (h w) -> b c h w', h=H // ratio_h_up)
+            x = overlap_embed(x)
+            h_up = overlap_embed(h_up)
+            _, C1, _, _ = x.shape
+            _, C2, _, _ = h_up.shape
+            x = rearrange(x, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C1//4)
+            h_up = rearrange(h_up, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C2 // 4)
             for (attn, ff) in layersA:
                 x = attn(x) + x
                 x = ff(x) + x
@@ -188,8 +195,8 @@ class TRD(nn.Module):
 
 
 
-class UNetTRD(nn.Module):
-    def __init__(self, input_channel, n_classes, kernel_size, feature_scale=4, bias=True):
+class UTRD(nn.Module):
+    def __init__(self, input_channel=3, n_classes=4, kernel_size=3, feature_scale=4, bias=True):
 
         super().__init__()
         self.input_channel = input_channel
@@ -247,7 +254,7 @@ class UNetTRD(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.TRD = TRD(ch_in=self.n_classes, ch_out=self.n_classes, heads=8, ff_expansion=8, reduction_ratio=8)
+        self.TRD = TRD(ch_in=self.n_classes, ch_out=self.n_classes, heads=2, ff_expansion=8, reduction_ratio=8)
         # self.RDC = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
 
     def forward(self, input, cell_state=None):

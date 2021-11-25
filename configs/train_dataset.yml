@@ -1,10 +1,10 @@
 model:
-    arch: NestUnet
+    arch: UNetTRD
 data:
-    dataset: HVSMR
+    dataset: MRBrainS
     train_split: train
     val_split: val
-    path: datasets/hvsmr2016/
+    path: datasets/mrbrains/
 
 training:
     gpu_idx: 0

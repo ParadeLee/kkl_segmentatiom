@@ -11,7 +11,7 @@ import numpy as np
 from torch.utils import data
 from tqdm import tqdm
 
-from kkl_segmentatiom.models.swinTransformer_segmentation import SwinTransformer
+
 from models import get_model
 from loss import get_loss_function
 from loader import get_loader
@@ -19,7 +19,7 @@ from utils.utils import get_logger
 from metrics import runningScore, averageMeter
 from schedulers import get_scheduler
 from optimizers import get_optimizer
-from models.UCTransNet import *
+from models.demoNet import *
 
 def train(cfg, logger):
 
@@ -70,7 +70,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = SwinTransformer().to(device)
+    model = UTRD().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
