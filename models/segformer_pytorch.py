@@ -148,7 +148,7 @@ class MiT(nn.Module):
 
             num_patches = x.shape[-1]
             ratio = int(sqrt((h * w) / num_patches))
-            x = rearrange(x, 'b c (h w) -> b c h w', h = h // ratio)
+            x = rearrange(x, 'b c (h w) -> b c h w', h=h // ratio)  # ratio是指缩放的比例
 
             x = overlap_embed(x)
             for (attn, ff) in layers:

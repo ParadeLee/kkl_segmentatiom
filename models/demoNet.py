@@ -1,3 +1,5 @@
+from math import sqrt
+
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -113,21 +115,93 @@ class MixFeedForward(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-class UNetRNN(nn.Module):
-    def __init__(self, input_channel, n_classes, kernel_size, feature_scale=4, decoder="LSTM", bias=True):
 
-        super(UNetRNN, self).__init__()
+class TRD(nn.Module):
+    def __init__(self, *, ch_in, ch_out, heads, ff_expansion, reduction_ratio, num_layers=2):
+        # ff_expansion=(8, 8, 4, 4), reduction_ratio=(8, 4, 2, 1), heads=(8, 5, 2, 1)
+        super().__init__()
+        block_kernel_stride_pad = (3, 2, 1)
+        dim_pairs = (ch_in, ch_out)
+        self.block = nn.ModuleList([])
+        for (dim_in, dim_out), (kernel, stride, padding) in zip(dim_pairs, block_kernel_stride_pad):
+            get_overlap_patches = nn.Unfold(kernel, stride=stride, padding=padding)
+            expand = nn.Linear(dim_in * (kernel ** 2), 4 * dim_in * (kernel ** 2), bias=False)
+            overlap_patch_embed = nn.Conv2d(dim_in * (kernel ** 2), dim_out, 1)
+            layers_a = nn.ModuleList([])
+            for _ in range(num_layers):
+                layers_a.append(nn.ModuleList([
+                    PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+                    PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
+                ]))
+            layers_b = nn.ModuleList([])
+            for _ in range(num_layers):
+                layers_b.append(nn.ModuleList([
+                    PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+                    PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
+                ]))
+            layers_c = nn.ModuleList([])
+            for _ in range(num_layers):
+                layers_c.append(nn.ModuleList([
+                    PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+                    PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
+                ]))
+            self.block.append(nn.ModuleList([
+                get_overlap_patches,
+                expand,
+                overlap_patch_embed,
+                layers_a,
+                layers_b,
+                layers_c
+            ]))
+    def forward(self, x, h):
+        h_up = F.interpolate(h, size=[x.size(2), x.size(3)], mode='bilinear', align_corners=True)
+        H, W = x.shape[-2:]
+        layer_outputs = []
+        for (get_overlap_patches, expand, overlap_embed, layersA, layersB, layersC) in self.block:
+            x = get_overlap_patches(x)
+            h_up = get_overlap_patches(h_up)
+            num_patches_x = x.shape[-1]
+            num_patches_h_up = h_up.shape[-1]
+            ratio_x = int(sqrt((H * W) / num_patches_x))
+            ratio_h_up = int(sqrt((H * W) / num_patches_h_up))
+            x = rearrange(x, 'b c (h w) -> b c h w', h=H // ratio_x)
+            h_up = rearrange(x, 'b c (h w) -> b c h w', h=H // ratio_h_up)
+            x = overlap_embed(x)
+            h_up = overlap_embed(h_up)
+            x = expand(x)
+            h_up = expand(h_up)
+            _, C, _, _ = x.shape
+            x = rearrange(x, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C//4)
+            for (attn, ff) in layersA:
+                x = attn(x) + x
+                x = ff(x) + x
+            for (attn, ff) in layersB:
+                h_up = attn(h_up) + h_up
+                h_up = ff(x) + x
+            for (attn, ff) in layersC:
+                x = attn(x, h_up) + x
+                x = ff(x) + x
+
+        return x
+
+
+
+
+
+class UNetTRD(nn.Module):
+    def __init__(self, input_channel, n_classes, kernel_size, feature_scale=4, bias=True):
+
+        super().__init__()
         self.input_channel = input_channel
         self.n_classes = n_classes
         self.kernel_size = kernel_size
         self.feature_scale = feature_scale
-        self.decoder = decoder
         self.bias = bias
 
         filters = [64, 128, 256, 512, 1024]
         filters = [int(x / self.feature_scale) for x in filters]
 
-        # downsampling
+        # downSampling
         self.conv1 = unetConv2(self.input_channel, filters[0], is_batchnorm=True)
 
         self.maxpool1 = nn.MaxPool2d(kernel_size=2)
@@ -173,6 +247,7 @@ class UNetRNN(nn.Module):
             nn.ReLU(inplace=True)
         )
 
+        self.TRD = TRD()
         # self.RDC = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
 
     def forward(self, input, cell_state=None):
@@ -196,39 +271,11 @@ class UNetRNN(nn.Module):
         x4 = self.score_block2(conv2)  # 1/2,class
         x5 = self.score_block1(conv1)  # 1,class
 
-        h0 = self._init_cell_state(x1)  # 1/16,512
 
-        # Decode
-        if self.decoder == "LSTM":
-            # init c0
-            if cell_state is not None:
-                raise NotImplementedError()
-            else:
-                c0 = self._init_cell_state(h0)
+        h1 = self.TRD(x_cur=x2, h_pre=x1)  # 1/16,class
+        h2 = self.RDC(x_cur=x3, h_pre=h1)  # 1/8,class
+        h3 = self.RDC(x_cur=x4, h_pre=h2)  # 1/4,class
+        h4 = self.RDC(x_cur=x5, h_pre=h3)  # 1/2,class
 
-            h1, c1 = self.RDC(x_cur=x1, h_pre=h0, c_pre=c0)  # 1/16,class
-            h2, c2 = self.RDC(x_cur=x2, h_pre=h1, c_pre=c1)  # 1/8,class
-            h3, c3 = self.RDC(x_cur=x3, h_pre=h2, c_pre=c2)  # 1/4,class
-            h4, c4 = self.RDC(x_cur=x4, h_pre=h3, c_pre=c3)  # 1/2,class
-            h5, c5 = self.RDC(x_cur=x5, h_pre=h4, c_pre=c4)  # 1,class
-
-
-        elif self.decoder == "GRU":
-            h1 = self.RDC(x_cur=x1, h_pre=h0)  # 1/16,class
-            h2 = self.RDC(x_cur=x2, h_pre=h1)  # 1/8,class
-            h3 = self.RDC(x_cur=x3, h_pre=h2)  # 1/4,class
-            h4 = self.RDC(x_cur=x4, h_pre=h3)  # 1/2,class
-            h5 = self.RDC(x_cur=x5, h_pre=h4)  # 1,class
-
-        elif self.decoder == "vanilla":
-            h1 = self.RDC(x_cur=x1, h_pre=h0)  # 1/16,class
-            h2 = self.RDC(x_cur=x2, h_pre=h1)  # 1/8,class
-            h3 = self.RDC(x_cur=x3, h_pre=h2)  # 1/4,class
-            h4 = self.RDC(x_cur=x4, h_pre=h3)  # 1/2,class
-            h5 = self.RDC(x_cur=x5, h_pre=h4)  # 1,class
-
-        else:
-            raise NotImplementedError
-
-        return h5
+        return h4
 
