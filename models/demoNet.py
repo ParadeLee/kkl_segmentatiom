@@ -165,14 +165,14 @@ class TRD(nn.Module):
             h_up = get_overlap_patches(h_up)
             print(h_up.size())
             print(x.size())
-            num_patches_x = x.shape[-1]
-            num_patches_h_up = h_up.shape[-1]
-            ratio_x = int(sqrt((H * W) / num_patches_x))
-            ratio_h_up = int(sqrt((H * W) / num_patches_h_up))
+            # num_patches_x = x.shape[-1]
+            # num_patches_h_up = h_up.shape[-1]
+            # ratio_x = int(sqrt((H * W) / num_patches_x))
+            # ratio_h_up = int(sqrt((H * W) / num_patches_h_up))
             x = expand(x)
             h_up = expand(h_up)
-            x = rearrange(x, 'b c (h w) -> b c h w', h=H // ratio_x)
-            h_up = rearrange(h_up, 'b c (h w) -> b c h w', h=H // ratio_h_up)
+            x = rearrange(x, 'b c (h w) -> b c h w', h=H // 2)
+            h_up = rearrange(h_up, 'b c (h w) -> b c h w', h=H // 2)
             x = overlap_embed(x)
             h_up = overlap_embed(h_up)
             _, C1, _, _ = x.shape
