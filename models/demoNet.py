@@ -93,8 +93,8 @@ class EfficientSelfAttention(nn.Module):
             q, k, v = (self.to_q(x), *self.to_kv(x).chunk(2, dim=1))
         else:
             q, k, v = (self.to_q(x), *self.to_inputkv(s).chunk(2, dim=1))
-        q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h=heads), (q, k, v))
 
+        q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h=heads), (q, k, v))
         sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
         attn = sim.softmax(dim=-1)
 
@@ -247,7 +247,7 @@ class UNetTRD(nn.Module):
             nn.ReLU(inplace=True)
         )
 
-        self.TRD = TRD()
+        self.TRD = TRD(ch_in=self.n_classes, ch_out=self.n_classes, heads=8, ff_expansion=8, reduction_ratio=8)
         # self.RDC = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
 
     def forward(self, input, cell_state=None):
@@ -271,11 +271,10 @@ class UNetTRD(nn.Module):
         x4 = self.score_block2(conv2)  # 1/2,class
         x5 = self.score_block1(conv1)  # 1,class
 
-
-        h1 = self.TRD(x_cur=x2, h_pre=x1)  # 1/16,class
-        h2 = self.RDC(x_cur=x3, h_pre=h1)  # 1/8,class
-        h3 = self.RDC(x_cur=x4, h_pre=h2)  # 1/4,class
-        h4 = self.RDC(x_cur=x5, h_pre=h3)  # 1/2,class
+        h1 = self.TRD(x2, x1)  # 1/16,class
+        h2 = self.TRD(x3, h1)  # 1/8,class
+        h3 = self.TRD(x4, h2)  # 1/4,class
+        h4 = self.TRD(x5, h3)  # 1/2,class
 
         return h4
 
