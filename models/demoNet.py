@@ -65,6 +65,14 @@ class PreNorm(nn.Module):
     def forward(self, x):
         return self.fn(self.norm(x))
 
+class PreNormMix(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.fn = fn
+        self.norm = LayerNorm(dim)
+    def forward(self, x, s):
+        return self.fn(self.norm(x), self.norm(s))
+
 class DsConv2d(nn.Module):
     def __init__(self, dim_in, dim_out, kernel_size, padding, stride=1, bias=True):
         super().__init__()
@@ -82,17 +90,39 @@ class EfficientSelfAttention(nn.Module):
         self.heads = heads
 
         self.to_q = nn.Conv2d(dim, dim, 1, bias=False)
-        self.to_inputkv = nn.Conv2d(dim, dim*2, 1, bias=False)
+        # self.to_inputkv = nn.Conv2d(dim, dim*2, 1, bias=False)
         self.to_kv = nn.Conv2d(dim, dim * 2, reduction_ratio, stride=reduction_ratio, bias=False)
         self.to_out = nn.Conv2d(dim, dim, 1, bias=False)
 
-    def forward(self, x, s=None):
+    def forward(self, x):
         h, w = x.shape[-2:]
         heads = self.heads
-        if s == None:
-            q, k, v = (self.to_q(x), *self.to_kv(x).chunk(2, dim=1))
-        else:
-            q, k, v = (self.to_q(x), *self.to_inputkv(s).chunk(2, dim=1))
+        q, k, v = (self.to_q(x), *self.to_kv(x).chunk(2, dim=1))
+
+        q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h=heads), (q, k, v))
+        sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
+        attn = sim.softmax(dim=-1)
+
+        out = einsum('b i j, b j d -> b i d', attn, v)
+        out = rearrange(out, '(b h) (x y) c -> b (h c) x y', h=heads, x=h, y=w)
+        return self.to_out(out)
+
+class EfficientSelfAttentionMix(nn.Module):
+    def __init__(self, *, dim, heads, reduction_ratio):
+        super().__init__()
+        self.scale = (dim // heads) ** -0.5
+        self.heads = heads
+
+        self.to_q = nn.Conv2d(dim, dim, 1, bias=False)
+        self.to_inputkv = nn.Conv2d(dim, dim*2, 1, bias=False)
+        # self.to_kv = nn.Conv2d(dim, dim * 2, reduction_ratio, stride=reduction_ratio, bias=False)
+        self.to_out = nn.Conv2d(dim, dim, 1, bias=False)
+
+    def forward(self, x, s):
+        h, w = x.shape[-2:]
+        heads = self.heads
+
+        q, k, v = (self.to_q(x), *self.to_inputkv(s).chunk(2, dim=1))
 
         q, k, v = map(lambda t: rearrange(t, 'b (h c) x y -> (b h) (x y) c', h=heads), (q, k, v))
         sim = einsum('b i d, b j d -> b i j', q, k) * self.scale
@@ -128,8 +158,8 @@ class TRD(nn.Module):
         dim_in = ch_in
         dim_out = ch_out
         get_overlap_patches = nn.Unfold(kernel, stride=stride, padding=padding)
-        expand = nn.Linear(dim_in * (kernel ** 2), 4 * dim_in * (kernel ** 2), bias=False)
-        overlap_patch_embed = nn.Conv2d(4 * dim_in * (kernel ** 2), dim_out, 1)
+        expand = nn.Conv2d(dim_out, 4 * dim_out, 1, bias=False)
+        overlap_patch_embed = nn.Conv2d(dim_in * (kernel ** 2), dim_out, 1)
         layers_a = nn.ModuleList([])
         for _ in range(num_layers):
             layers_a.append(nn.ModuleList([
@@ -143,11 +173,11 @@ class TRD(nn.Module):
                 PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
             ]))
         layers_c = nn.ModuleList([])
-        for _ in range(num_layers):
-            layers_c.append(nn.ModuleList([
-                PreNorm(dim_out, EfficientSelfAttention(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
-                PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
-            ]))
+        # for _ in range(num_layers):
+        layers_c.append(nn.ModuleList([
+            PreNormMix(dim_out, EfficientSelfAttentionMix(dim=dim_out, heads=heads, reduction_ratio=reduction_ratio)),
+            PreNorm(dim_out, MixFeedForward(dim=dim_in, expansion_factor=ff_expansion))
+        ]))
         self.block.append(nn.ModuleList([
             get_overlap_patches,
             expand,
@@ -157,6 +187,8 @@ class TRD(nn.Module):
             layers_c
         ]))
     def forward(self, x, h):
+        print(h.size())
+        print(x.size())
         h_up = F.interpolate(h, size=[x.size(2), x.size(3)], mode='bilinear', align_corners=True)
         H, W = x.shape[-2:]
         layer_outputs = []
@@ -169,22 +201,24 @@ class TRD(nn.Module):
             # num_patches_h_up = h_up.shape[-1]
             # ratio_x = int(sqrt((H * W) / num_patches_x))
             # ratio_h_up = int(sqrt((H * W) / num_patches_h_up))
-            x = expand(x)
-            h_up = expand(h_up)
             x = rearrange(x, 'b c (h w) -> b c h w', h=H // 2)
             h_up = rearrange(h_up, 'b c (h w) -> b c h w', h=H // 2)
             x = overlap_embed(x)
             h_up = overlap_embed(h_up)
+            x = expand(x)
+            h_up = expand(h_up)
             _, C1, _, _ = x.shape
             _, C2, _, _ = h_up.shape
             x = rearrange(x, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C1//4)
             h_up = rearrange(h_up, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C2 // 4)
+            print(h_up.size())
+            print(x.size())
             for (attn, ff) in layersA:
                 x = attn(x) + x
                 x = ff(x) + x
             for (attn, ff) in layersB:
                 h_up = attn(h_up) + h_up
-                h_up = ff(x) + x
+                h_up = ff(h_up) + x
             for (attn, ff) in layersC:
                 x = attn(x, h_up) + x
                 x = ff(x) + x
