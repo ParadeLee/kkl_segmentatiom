@@ -114,7 +114,8 @@ class EfficientSelfAttentionMix(nn.Module):
         self.heads = heads
 
         self.to_q = nn.Conv2d(dim, dim, 1, bias=False)
-        self.to_inputkv = nn.Conv2d(dim, dim*2, 1, bias=False)
+        self.to_inputkv = nn.Conv2d(dim, dim*2, reduction_ratio, stride=reduction_ratio, bias=False)
+        # self.to_inputkv = nn.Conv2d(dim, dim * 2, 1, bias=False)
         # self.to_kv = nn.Conv2d(dim, dim * 2, reduction_ratio, stride=reduction_ratio, bias=False)
         self.to_out = nn.Conv2d(dim, dim, 1, bias=False)
 
@@ -187,16 +188,14 @@ class TRD(nn.Module):
             layers_c
         ]))
     def forward(self, x, h):
-        print(h.size())
-        print(x.size())
         h_up = F.interpolate(h, size=[x.size(2), x.size(3)], mode='bilinear', align_corners=True)
         H, W = x.shape[-2:]
         layer_outputs = []
         for (get_overlap_patches, expand, overlap_embed, layersA, layersB, layersC) in self.block:
             x = get_overlap_patches(x)
             h_up = get_overlap_patches(h_up)
-            print(h_up.size())
-            print(x.size())
+            # print(h_up.size())
+            # print(x.size())
             # num_patches_x = x.shape[-1]
             # num_patches_h_up = h_up.shape[-1]
             # ratio_x = int(sqrt((H * W) / num_patches_x))
@@ -211,8 +210,6 @@ class TRD(nn.Module):
             _, C2, _, _ = h_up.shape
             x = rearrange(x, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C1//4)
             h_up = rearrange(h_up, 'b (p1 p2 c) h w -> b c (p1 h) (p2 w)', p1=2, p2=2, c=C2 // 4)
-            print(h_up.size())
-            print(x.size())
             for (attn, ff) in layersA:
                 x = attn(x) + x
                 x = ff(x) + x
