@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 
-class ConvBNReLU(nn.Module):
+class ConvBNReLU(nn.Module):  # 卷积BN和激活函数
     def __init__(self,
                  c_in,
                  c_out,
@@ -77,7 +77,6 @@ class U_encoder(nn.Module):
         x = self.res3(x)
         features.append(x)  # (56, 56, 256)
         x = self.pool3(x)
-
         return x, features
 
 
@@ -242,7 +241,7 @@ class WinAttention(nn.Module):
                       1).contiguous().view(b, h // self.window_size,
                                            w // self.window_size,
                                            self.window_size * self.window_size,
-                                           c).cuda()
+                                           c).cpu()
         x = self.attention(x)  # (b, p, p, win, h)
         return x
 
@@ -281,12 +280,12 @@ class GaussianTrans(nn.Module):
                 atten_y = atten_y_full[:, c, r, :]  # (b, h)
 
                 dis_x = torch.tensor([(h - c)**2 for h in range(x.shape[2])
-                                      ]).cuda()  # (b, w)
+                                      ]).cpu()  # (b, w)
                 dis_y = torch.tensor([(w - r)**2 for w in range(x.shape[1])
-                                      ]).cuda()  # (b, h)
+                                      ]).cpu()  # (b, h)
 
-                dis_x = -(self.shift * dis_x + self.bias).cuda()
-                dis_y = -(self.shift * dis_y + self.bias).cuda()
+                dis_x = -(self.shift * dis_x + self.bias).cpu()
+                dis_y = -(self.shift * dis_y + self.bias).cpu()
 
                 atten_x = self.softmax(dis_x + atten_x)
                 atten_y = self.softmax(dis_y + atten_y)

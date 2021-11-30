@@ -287,6 +287,7 @@ class UTRD(nn.Module):
 
         self.TRD = TRD(ch_in=self.n_classes, ch_out=self.n_classes, heads=2, ff_expansion=8, reduction_ratio=8)
         # self.RDC = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+        self.SegmentationHead = nn.Conv2d(64, n_classes, 1)
 
     def forward(self, input, cell_state=None):
         conv1 = self.conv1(input)  # 1,filters[0]

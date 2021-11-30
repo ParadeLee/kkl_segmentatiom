@@ -1,4 +1,5 @@
 import yaml
+import torch
 import argparse
 import numpy as np
 import seaborn as sns
@@ -11,7 +12,6 @@ from tqdm import tqdm
 from os.path import join as pjoin
 import matplotlib.pyplot as plt
 import pandas as pd
-from kkl_segmentatiom.badmodels.NsetUnet import *
 
 def test(cfg):
 
