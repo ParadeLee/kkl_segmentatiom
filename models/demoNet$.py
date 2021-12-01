@@ -220,10 +220,10 @@ class TRD(nn.Module):
                 h_up = attn(h_up) + h_up
                 h_up = ff(h_up) + h_up
             for (attn, ff) in layersC:
-                # mid = torch.cat((x, h_up), dim=1)
-                # mid = cut_dim(mid)
-                # x = attn(x, h_up) + mid
-                x = attn(x, h_up) + x
+                mid = torch.cat((x, h_up), dim=1)
+                mid = cut_dim(mid)
+                x = attn(x, h_up) + mid
+                # x = attn(x, h_up) + x
                 x = ff(x) + x
 
         return x
