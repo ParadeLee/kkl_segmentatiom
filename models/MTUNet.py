@@ -383,7 +383,6 @@ class Stem(nn.Module):
         self.position_embedding = nn.Parameter(torch.zeros((1, 784, 256)))
 
     def forward(self, x):
-
         x, features = self.model(x)  # (1, 512, 28, 28)
         x = self.trans_dim(x)  # (B, C, H, W) (1, 256, 28, 28)
         x = x.flatten(2)  # (B, H, N)  (1, 256, 28*28)

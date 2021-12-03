@@ -8,11 +8,11 @@ data:
 
 training:
     gpu_idx: 0
-    train_iters: 10000
+    train_iters: 3000
     batch_size: 1
-    val_interval: 100
+    val_interval: 50
     n_workers: 4
-    print_interval: 50
+    print_interval: 25
     optimizer:
         name: 'adam'
         lr: 6.0e-4
