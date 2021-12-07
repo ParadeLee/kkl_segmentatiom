@@ -8,7 +8,7 @@ data:
 
 training:
     gpu_idx: 0
-    train_iters: 3000
+    train_iters: 10000
     batch_size: 1
     val_interval: 50
     n_workers: 4
