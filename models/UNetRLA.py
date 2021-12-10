@@ -3,6 +3,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
+    """3x3 convolution with padding"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+
+def conv1x1(in_planes, out_planes, stride=1):
+    """1x1 convolution"""
+    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
+
 class UNetConv2d(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
@@ -75,14 +84,56 @@ class RLACell(nn.Module):
 
         return h_next, c_next
 
+class RLA(nn.Module):
+    expansion = 4
+    def __init__(self, in_dim, out_dim, stride=1, rla_channel=32,
+                 groups=1, base_width=64, dilation=1, reduction=16,
+                 down_sample=None):
+        super().__init__()
+        norm_layer = nn.BatchNorm2d
+        width = int(out_dim * (base_width / 64.)) * groups
+        self.conv1 = conv1x1(in_dim + rla_channel, width)
+        self.bn1 = norm_layer(width)
+        self.conv2 = conv3x3(width, width, stride, groups, dilation)
+        self.bn2 = norm_layer(width)
+        self.conv3 = conv1x1(width, out_dim * self.expansion)
+        self.bn3 = norm_layer(out_dim * self.expansion)
+        self.relu = nn.ReLU(inplace=True)
+        # self.averagePooling = nn.AvgPool2d((2, 2), stride=(2, 2))
+
+
+    def forward(self, x, h, c):
+        identity = x
+        x = torch.cat((x, h), dim=1)
+
+        # 1*1block
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        # 3*3block
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out)
+
+        # 1*1block
+        out = self.conv3(out)
+        out = self.bn3(out)
+        y = out
+        out += identity
+        out = self.relu(out)
+        return out, y, h, c
+
 class UNetRLA(nn.Module):
-    def __init__(self, input_channel, n_classes, kernel_size, expansion=4, bias=True):
+    def __init__(self, input_channel, n_classes, kernel_size, expansion=4, bias=True,
+                 rla_channel=32):
         super().__init__()
         self.input_channel = input_channel
         self.n_classes = n_classes
         self.kernel_size = kernel_size
         self.expansion = expansion
         self.bias = bias
+        self.rla_channel = rla_channel
 
         filters = [64, 128, 256, 512, 1024]
 
@@ -100,6 +151,14 @@ class UNetRLA(nn.Module):
         self.maxpool4 = nn.MaxPool2d(kernel_size=2)
 
         self.bottom = UNetConv2d(filters[3], filters[4])
+
+    def forward(self, x):
+        B, _, H, W = x.size()
+        h = torch.zeros(B, self.rla_channel, H, W)
+        c = torch.zeros(B, self.rla_channel, H, W)
+        x, y, h, c = RLA(x, h, c)
+
+
 
 
 
