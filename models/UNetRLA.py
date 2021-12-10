@@ -1,7 +1,45 @@
 import torch
-import torch as nn
+import torch.nn as nn
 import torch.nn.functional as F
 import math
+
+class UNetConv2d(nn.Module):
+    def __init__(self, in_dim, out_dim):
+        super().__init__()
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(in_dim, out_dim, 3, 1, 1),
+            nn.BatchNorm2d(out_dim),
+            nn.ReLU()
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(in_dim, out_dim, 3, 1, 1),
+            nn.BatchNorm2d(out_dim),
+            nn.ReLU()
+        )
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.conv2(x)
+        return x
+
+class UNetUP(nn.Module):
+    def __init__(self, in_dim, out_dim, is_deconv=True):
+        super().__init__()
+        self.conv = UNetConv2d(in_dim, out_dim)
+        if is_deconv:
+            self.up = nn.ConvTranspose2d(in_dim, out_dim, kernel_size=2, stride=2)
+        else:
+            self.up = nn.UpsamplingBilinear2d(scale_factor=2)
+
+    def forward(self, x, y):
+        y = self.up(y)
+        # y = F.interpolate(y, size=[x.size(2), x.size(3)], mode='bilinear', align_corners=True)
+        # offset = y.size()[2] - x.size()[2]
+        # padding = 2 * [offset // 2, offset // 2]
+        # x = F.pad(x, padding)
+        y = F.interpolate(y, size=[x.size(2), x.size(3)], mode='bilinear',
+                          align_corners=True)
+        output = self.conv(torch.cat([x, y], 1))
+        return output
 
 class RLACell(nn.Module):
 
@@ -38,5 +76,31 @@ class RLACell(nn.Module):
         return h_next, c_next
 
 class UNetRLA(nn.Module):
-    def __init__(self, input_channel, n_class, kernel_size, expansion=4, bias=True):
+    def __init__(self, input_channel, n_classes, kernel_size, expansion=4, bias=True):
         super().__init__()
+        self.input_channel = input_channel
+        self.n_classes = n_classes
+        self.kernel_size = kernel_size
+        self.expansion = expansion
+        self.bias = bias
+
+        filters = [64, 128, 256, 512, 1024]
+
+        # downsampling
+        self.conv1 = UNetConv2d(self.input_channel, filters[0])
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2)
+
+        self.conv2 = UNetConv2d(filters[0], filters[1])
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2)
+
+        self.conv3 = UNetConv2d(filters[1], filters[2])
+        self.maxpool3 = nn.MaxPool2d(kernel_size=2)
+
+        self.conv4 = UNetConv2d(filters[2], filters[3])
+        self.maxpool4 = nn.MaxPool2d(kernel_size=2)
+
+        self.bottom = UNetConv2d(filters[3], filters[4])
+
+
+
+
