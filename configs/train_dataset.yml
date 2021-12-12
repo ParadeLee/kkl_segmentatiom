@@ -24,6 +24,6 @@ training:
     model_dir: trained_models/Segformer
 
 testing:
-    trained_model: trained_models/NesTUnet/NestUnet_BrainWeb.pkl
-    path: trained_models/NesTUnet/images
+    trained_model: trained_models/UCTransNet/UNetTRD_MRBrainS.pkl
+    path: trained_models/UCTransNet/images
     boxplot: False

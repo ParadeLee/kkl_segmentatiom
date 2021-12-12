@@ -19,7 +19,8 @@ from utils.utils import get_logger
 from metrics import runningScore, averageMeter
 from schedulers import get_scheduler
 from optimizers import get_optimizer
-from models.MTUNet import *
+
+from models.UNetRLA import *
 
 
 def train(cfg, logger):
@@ -71,7 +72,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = MTUNet().to(device)
+    model = UNetRLA().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 

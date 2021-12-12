@@ -12,6 +12,7 @@ from tqdm import tqdm
 from os.path import join as pjoin
 import matplotlib.pyplot as plt
 import pandas as pd
+from models.UNetRLA import *
 
 def test(cfg):
 
@@ -32,9 +33,7 @@ def test(cfg):
     )
 
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = NesTUnet(image_size=224, patch_size=4, num_classes=4, dim=96, heads=3, num_hierarchies=3,
-                     block_repeats=(2, 2, 8),
-                     mlp_mult=4, channels=3, dim_head=64, dropout=0.).to(device)
+    model = UNetRLA().to(device)
     state = convert_state_dict(torch.load(cfg["testing"]["trained_model"], map_location=device)["model_state"])
     model.load_state_dict(state)
     model.eval()
