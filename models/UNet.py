@@ -22,7 +22,7 @@ class DoubleConv(nn.Module):
 
 
 class Unet(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_ch=3, out_ch=4):
         super(Unet, self).__init__()
 
         self.conv1 = DoubleConv(in_ch, 32)

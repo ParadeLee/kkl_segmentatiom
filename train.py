@@ -20,9 +20,9 @@ from metrics import runningScore, averageMeter
 from schedulers import get_scheduler
 from optimizers import get_optimizer
 
-from models.UNetRLA import *
+# from models.UNetRLARDC import *
 
-
+from models.UNet import Unet
 def train(cfg, logger):
 
     # Setup Seeds
@@ -72,7 +72,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = UNetRLA().to(device)
+    model = Unet().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
@@ -194,6 +194,7 @@ def train(cfg, logger):
                     save_path = os.path.join(
                         cfg["training"]["model_dir"], "{}_{}.pkl".format(cfg["model"]["arch"], cfg["data"]["dataset"]),
                     )
+                    print('Best val acc = ', score["Dice : \t"])
                     torch.save(state, save_path)
 
             if (i + 1) == cfg["training"]["train_iters"]:
