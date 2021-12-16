@@ -352,7 +352,7 @@ class ChannelTransformer(nn.Module):
         emb3 = self.embeddings_3(en3)
         emb4 = self.embeddings_4(en4)
 
-        encoded1, encoded2, encoded3, encoded4, attn_weights = self.encoder(emb1,emb2,emb3,emb4)  # (B, n_patch, hidden)
+        encoded1, encoded2, encoded3, encoded4, attn_weights = self.encoder(emb1, emb2, emb3, emb4)  # (B, n_patch, hidden)
         x1 = self.reconstruct_1(encoded1) if en1 is not None else None
         x2 = self.reconstruct_2(encoded2) if en2 is not None else None
         x3 = self.reconstruct_3(encoded3) if en3 is not None else None
