@@ -22,7 +22,7 @@ from optimizers import get_optimizer
 
 # from models.UNetRLARDC import *
 
-from models.UNet import Unet
+from models.UNet_ctransnet import Unet
 def train(cfg, logger):
 
     # Setup Seeds
@@ -196,6 +196,7 @@ def train(cfg, logger):
                     )
                     print('Best val acc = ', score["Dice : \t"])
                     torch.save(state, save_path)
+                print('Best val acc = ', best_dice)
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False
