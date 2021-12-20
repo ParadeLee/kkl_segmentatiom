@@ -5,6 +5,7 @@ import math
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 
 class ConvBNReLU(nn.Module):  # 卷积BN和激活函数
@@ -67,15 +68,15 @@ class U_encoder(nn.Module):
     def forward(self, x):
         features = []
         x = self.res1(x)
-        features.append(x)  # (224, 224, 64)
+        features.append(x)  # (240, 240, 64)
         x = self.pool1(x)
 
         x = self.res2(x)
-        features.append(x)  # (112, 112, 128)
+        features.append(x)  # (120, 120, 128)
         x = self.pool2(x)
 
         x = self.res3(x)
-        features.append(x)  # (56, 56, 256)
+        features.append(x)  # (60, 60, 256)
         x = self.pool3(x)
         return x, features
 
@@ -380,13 +381,13 @@ class Stem(nn.Module):
         super(Stem, self).__init__()
         self.model = U_encoder()
         self.trans_dim = ConvBNReLU(256, 256, 1, 1, 0)  #out_dim, model_dim
-        self.position_embedding = nn.Parameter(torch.zeros((1, 784, 256)))
+        self.position_embedding = nn.Parameter(torch.zeros((1, 900, 256)))
 
     def forward(self, x):
-        x, features = self.model(x)  # (1, 512, 28, 28)
-        x = self.trans_dim(x)  # (B, C, H, W) (1, 256, 28, 28)
-        x = x.flatten(2)  # (B, H, N)  (1, 256, 28*28)
-        x = x.transpose(-2, -1)  #  (B, N, H)
+        x, features = self.model(x)  # (1, 512, 30, 30)
+        x = self.trans_dim(x)  # (B, C, H, W) (1, 256, 30, 30)
+        x = x.flatten(2)  # (B, H, N)  (1, 256, 30*30)
+        x = x.transpose(-2, -1)  #  (B, N, H)  (1, 900, 256)
         x = x + self.position_embedding
         return x, features  #(B, N, H)
 
@@ -441,6 +442,7 @@ class decoder_block(nn.Module):
     def forward(self, x, skip):
         if not self.flag:
             x = self.block[0](x)
+            x = F.interpolate(x, size=(skip.size(2), skip.size(3)), mode='bilinear', align_corners=True)
             x = torch.cat((x, skip), dim=1)
             x = self.block[1](x)
             x = x.permute(0, 2, 3, 1)

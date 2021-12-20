@@ -4,15 +4,16 @@ data:
     dataset: MRBrainS
     train_split: train
     val_split: val
-    path: datasets/mrbrains/
+    path: /data/home/ywen/lk/datasets/mrbrains/
+#    path: datasets/mrbrains/
 
 training:
     gpu_idx: 0
     train_iters: 20000
     batch_size: 1
-    val_interval: 100
+    val_interval: 50
     n_workers: 4
-    print_interval: 50
+    print_interval: 25
     optimizer:
         name: 'adam'
         lr: 6.0e-4
@@ -21,9 +22,9 @@ training:
         name: 'cross_entropy'
     lr_schedule:
     resume:
-    model_dir: trained_models/MTUNet
+    model_dir: /data/home/ywen/lk/kkl_seg2021/kkl_segmentatiom/trained_models/UNetRLA
 
 testing:
-    trained_model: trained_models/UCTransNet/UNetTRD_MRBrainS.pkl
-    path: trained_models/UCTransNet/images
+    trained_model: 
+    path: 
     boxplot: False

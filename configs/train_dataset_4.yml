@@ -1,10 +1,10 @@
 model:
-    arch: UNetRLA
+    arch: UNet_ctransnet
 data:
     dataset: MRBrainS
     train_split: train
     val_split: val
-    path: datasets/mrbrains/
+    path: /data/home/ywen/lk/datasets/mrbrains/
 
 training:
     gpu_idx: 0
@@ -21,9 +21,9 @@ training:
         name: 'cross_entropy'
     lr_schedule:
     resume:
-    model_dir: trained_models/MTUNet
-
+    model_dir: /data/home/ywen/lk/kkl_seg2021/kkl_segmentatiom/trained_models/UNet_ctransnet
+#    model_dir: trained_models/MTUNet
 testing:
-    trained_model: trained_models/UCTransNet/UNetTRD_MRBrainS.pkl
-    path: trained_models/UCTransNet/images
-    boxplot: False
+    trained_model:
+    path:
+    boxplot:

@@ -22,7 +22,8 @@ from optimizers import get_optimizer
 
 # from models.UNetRLARDC import *
 
-from models.UNet_ctransnet import UNet_Ctrans
+from models.UNet_ctransnet_CRDN import UNet_Ctrans_CRDN
+
 def train(cfg, logger):
 
     # Setup Seeds
@@ -72,7 +73,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = UNet_Ctrans().to(device)
+    model = UNet_Ctrans_CRDN().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
@@ -209,7 +210,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/train_dataset.yml",
+        default="configs/train_dataset_copy.yml",
         help="Configuration file to use",
     )
 

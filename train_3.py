@@ -22,7 +22,7 @@ from optimizers import get_optimizer
 
 # from models.UNetRLARDC import *
 
-from models.UNetRLARDC import UNetRLARDC
+from models.MTUNet import MTUNet
 
 
 def train(cfg, logger):
@@ -74,7 +74,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = UNetRLARDC().to(device)
+    model = MTUNet().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
@@ -115,6 +115,7 @@ def train(cfg, logger):
     time_meter = averageMeter()
 
     start_iter = 0
+    best_pa = -100.0
     best_dice = -100.0
     i = start_iter
     flag = True
@@ -200,6 +201,7 @@ def train(cfg, logger):
                     print('Best pa = ', score["PA: \t"])
                     print('Best val acc = ', score["Dice : \t"])
                     torch.save(state, save_path)
+                print('Best pa = ', best_pa)
                 print('Best val acc = ', best_dice)
 
             if (i + 1) == cfg["training"]["train_iters"]:
@@ -213,7 +215,7 @@ if __name__ == "__main__":
         "--config",
         nargs="?",
         type=str,
-        default="configs/train_dataset.yml",
+        default="configs/train_dataset_4.yml",
         help="Configuration file to use",
     )
 

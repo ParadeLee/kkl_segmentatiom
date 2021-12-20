@@ -153,6 +153,7 @@ class UNetRLA(nn.Module):
         self.rla_channel = rla_channel
 
         filters = [64, 128, 256, 512, 1024]
+        filters = [int(x / self.expansion) for x in filters]
 
         # downsampling
         self.conv1 = UNetConv2d(self.input_channel, filters[0])

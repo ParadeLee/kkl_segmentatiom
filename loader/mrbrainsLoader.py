@@ -49,11 +49,11 @@ class mrbrainsLoader(data.Dataset):
         pd = m.imread(pd_path)
         lbl = m.imread(lbl_path)
 
-        newsize = 224
-        t1 = m.imresize(t1, [newsize, newsize], interp='bilinear', mode=None)
-        t2 = m.imresize(t2, [newsize, newsize], interp='bilinear', mode=None)
-        pd = m.imresize(pd, [newsize, newsize], interp='bilinear', mode=None)
-        lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
+        # newsize = 224
+        # t1 = m.imresize(t1, [newsize, newsize], interp='bilinear', mode=None)
+        # t2 = m.imresize(t2, [newsize, newsize], interp='bilinear', mode=None)
+        # pd = m.imresize(pd, [newsize, newsize], interp='bilinear', mode=None)
+        # lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
 
         img = np.stack((t1, t2, pd), axis=0)
         img, lbl = self.transform(img, lbl)

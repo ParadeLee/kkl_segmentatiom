@@ -6,7 +6,7 @@ import math
 __all__ = ['UNetRNN', 'VGG16RNN', 'ResNet18RNN', 'ResNet50RNN', 'ResNet34RNN', 'ResNet101RNN', 'ResNet152RNN', 'ResNet50UNet', 'ResNet50FCN']
 
 class RDC(nn.Module):
-    def __init__(self, hidden_dim, kernel_size, bias, decoder='GRU'):
+    def __init__(self, hidden_dim, kernel_size, bias, decoder='LSTM'):
         """
         Recurrent Decoding Cell (RDC) module.
         :param hidden_dim:
@@ -75,7 +75,7 @@ Implementation code for CRDN with U-Net-backbone (UNetRNN).
 
 
 class UNetRNN(nn.Module):
-    def __init__(self, input_channel, n_classes, kernel_size, feature_scale=4, decoder="LSTM", bias=True):
+    def __init__(self, input_channel=3, n_classes=4, kernel_size=3, feature_scale=4, decoder="LSTM", bias=True):
 
         super(UNetRNN, self).__init__()
         self.input_channel = input_channel

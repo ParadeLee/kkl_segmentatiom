@@ -215,7 +215,8 @@ class UNetRLARDC(nn.Module):
         self.rla_channel = rla_channel
         self.decoder = Decoder
 
-        filters = [32, 64, 128, 256, 512]
+        filters = [64, 128, 256, 512, 1024]
+        filters = [int(x / self.expansion) for x in filters]
 
         # downsampling
         self.conv1 = UNetConv2d(self.input_channel, filters[0])
