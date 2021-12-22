@@ -113,7 +113,7 @@ def train(cfg, logger):
     # Start Training
     val_loss_meter = averageMeter()
     time_meter = averageMeter()
-
+    best_pa = -100.0
     start_iter = 0
     best_dice = -100.0
     i = start_iter
@@ -201,6 +201,7 @@ def train(cfg, logger):
                     print('Best val acc = ', score["Dice : \t"])
                     torch.save(state, save_path)
                 print('Best val acc = ', best_dice)
+                print('Best val acc = ', best_pa)
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False
