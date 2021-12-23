@@ -9,7 +9,8 @@ from loss.cross_entropy2d import (
 logger = logging.getLogger("ptsemseg")
 
 key2loss = {
-    "cross_entropy": cross_entropy2d
+    "cross_entropy": cross_entropy2d,
+    "total loss": total_loss
 }
 
 

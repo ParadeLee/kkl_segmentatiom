@@ -5,6 +5,7 @@ import torch.nn.functional as F
 class convlayer(nn.Module):
     """3x3 convolution with padding"""
     def __init__(self, in_dims, out_dims, stride, groups=1, dilation=1, is_batchnorm=True):
+        super().__init__()
         if is_batchnorm:
             self.conv = nn.Sequential(
                 nn.Conv2d(in_dims, out_dims, kernel_size=3, stride=stride, padding=dilation,
@@ -44,7 +45,7 @@ class convup(nn.Module):
 
 
 class ANN(nn.Module):
-    def __init__(self, in_dim=3, out_dim=4, is_batchnorm=True):
+    def __init__(self, in_dim=3, out_dim=1, is_batchnorm=True):
         super().__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
