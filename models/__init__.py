@@ -14,9 +14,8 @@ def get_model(model_dict, n_classes, version=None):
         model = model(input_channel=3, n_classes=n_classes, kernel_size=3, feature_scale=4, decoder="LSTM", bias=True,
                       is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
 
-    elif name == "NestUnet":
-        model == model(image_size=224, patch_size=56, num_classes=4, dim=96, heads=3, num_hierarchies=3, block_repeats=(2, 2, 8),
-                       mlp_mult=4, channels=3, dim_head=64, dropout=0.)
+
+
     else:
         pass
     return model

@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from torch.utils import data
 import scipy.misc as m
 from torchvision import transforms
+import mmcv
+
 from PIL import Image
 
 
@@ -18,6 +20,9 @@ class brainwebLoader_new(data.Dataset):
         # root = '/data/home/ywen/lk/datasets/brainweb/'
         # root = 'datasets/brainweb/'
         self.root = root
+        self.resize = (224, 224)
+        self.pad_val = 0
+        self.seg_pad_val = 255
         self.split = split
         self.n_classes = 4
         self.files = collections.defaultdict(list)
@@ -50,25 +55,15 @@ class brainwebLoader_new(data.Dataset):
         # pd_path = self.root + 'imgs/pd/' + img_name + '.bmp'
         lbl_path = self.root + 'gt/' + img_name + '.bmp'
 
-        # np:(h,w,c)
-        img = Image.open(img_path)
-        # t1 = m.imread(t1_path)
-        # t2 = m.imread(t2_path)
-        # pd = m.imread(pd_path)
-        # img = np.stack((t1,t2,pd), axis=2)
-        lbl = np.array(Image.open(lbl_path))
-        newsize = 224
-        background = Image.new('RGB', (newsize, newsize), (0, 0, 0))  # black
-        W = img.size[0]
-        H = img.size[1]
-        background.paste(img, (0, 0))
-        img = np.array(background)
-        background = np.array(background.convert('L'), 'f')
-        lbl = np.pad(lbl, ((0, newsize-H), (0, newsize-W)), 'constant', constant_values=(0, 0))
-        # print(str(lbl))
-        lbl = background + lbl
+        img = m.imread(img_path)
+        lbl = m.imread(lbl_path)
+        padding_img = mmcv.impad(img, shape=self.resize, pad_val=self.pad_val)
+        padding_lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
 
-        img, lbl = self.transform(img, lbl)
+        # padding_img = mmcv.impad_to_multiple(img, divisor=32, pad_val=0)
+        # padding_lbl = mmcv.impad_to_multiple(lbl, divisor=32, pad_val=255)
+
+        img, lbl = self.transform(padding_img, padding_lbl)
 
         return img, lbl, img_name
 
@@ -126,7 +121,7 @@ class brainwebLoader_new(data.Dataset):
 
 
 def debug_load():
-    root = '/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/'
+    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/brainweb/'
 
     t_loader = brainwebLoader_new(
 		root,
@@ -144,7 +139,7 @@ def debug_load():
 
         labels = np.squeeze(labels.data.numpy())
         decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/result_image_when_training/brainweb', '{}.bmp'.format(img_name[0])), decoded)
+        m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/brainweb/', '{}.bmp'.format(img_name[0])), decoded)
         print('.')
 
         # tensor2numpy

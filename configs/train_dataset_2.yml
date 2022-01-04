@@ -4,7 +4,7 @@ data:
     dataset: MRBrainS
     train_split: train
     val_split: val
-    path: /data/home/ywen/lk/datasets/mrbrains/
+    path: datasets/mrbrains/
 
 training:
     gpu_idx: 0

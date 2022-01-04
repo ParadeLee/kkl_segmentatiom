@@ -22,7 +22,7 @@ from optimizers import get_optimizer
 
 # from models.UNetRLARDC import *
 
-from models.UNetRLARDC import UNetRLARDC
+from models.UNet_ANN import UNet_ANN
 
 
 def train(cfg, logger):
@@ -74,7 +74,7 @@ def train(cfg, logger):
 
     # Setup Model
     # model = get_model(cfg["model"], n_classes).to(device)
-    model = UNetRLARDC().to(device)
+    model = UNet_ANN().to(device)
     # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
     model = torch.nn.DataParallel(model, device_ids=[0])
 
@@ -120,18 +120,19 @@ def train(cfg, logger):
     flag = True
 
     while i <= cfg["training"]["train_iters"] and flag:
-        for (images, labels, img_name) in trainloader:
+        for (images, gray, labels, img_name) in trainloader:
             i += 1
             start_ts = time.time()
             scheduler.step()
             model.train()
             images = images.to(device)
+            gray = gray.to(device)
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs = model(images)
+            outputs, grad = model(images, gray)
 
-            loss = loss_fn(input=outputs, target=labels)
+            loss = loss_fn(input=outputs, grad=grad, target=labels)
 
             loss.backward()
             optimizer.step()
@@ -156,12 +157,13 @@ def train(cfg, logger):
             if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) == cfg["training"]["train_iters"]:
                 model.eval()
                 with torch.no_grad():
-                    for i_val, (images_val, labels_val, img_name_val) in tqdm(enumerate(valloader)):
+                    for i_val, (images_val, gray_val, labels_val, img_name_val) in tqdm(enumerate(valloader)):
                         images_val = images_val.to(device)
+                        gray_val = gray_val.to(device)
                         labels_val = labels_val.to(device)
 
-                        outputs = model(images_val)
-                        val_loss = loss_fn(input=outputs, target=labels_val)
+                        outputs, grad = model(images_val, gray_val)
+                        val_loss = loss_fn(input=outputs, grad=grad, target=labels_val)
 
                         pred = outputs.data.max(1)[1].cpu().numpy()
                         gt = labels_val.data.cpu().numpy()
@@ -200,8 +202,8 @@ def train(cfg, logger):
                     print('Best pa = ', score["PA: \t"])
                     print('Best val acc = ', score["Dice : \t"])
                     torch.save(state, save_path)
+                print('Best pa = ', best_pa)
                 print('Best val acc = ', best_dice)
-                print('Best val acc = ', best_pa)
 
             if (i + 1) == cfg["training"]["train_iters"]:
                 flag = False

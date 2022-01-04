@@ -1,10 +1,10 @@
 model:
-    arch: UNetRLA
+    arch: UNet_ANN
 data:
-    dataset: MRBrainS
+    dataset: HVSMR_ann
     train_split: train
     val_split: val
-    path: datasets/mrbrains/
+    path: datasets/hvsmr/
 
 training:
     gpu_idx: 0
@@ -18,10 +18,10 @@ training:
         lr: 6.0e-4
         weight_decay: 0.0005
     loss:
-        name: 'cross_entropy'
+        name: 'total_loss'
     lr_schedule:
     resume:
-    model_dir: trained_models/MTUNet
+    model_dir: trained_models/NesTUnet
 
 testing:
     trained_model: trained_models/UCTransNet/UNetTRD_MRBrainS.pkl

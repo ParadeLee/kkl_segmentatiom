@@ -7,27 +7,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils import data
 import scipy.misc as m
+from PIL import Image
 from torchvision import transforms
-import torch.nn.functional as F
 
 
-class brainwebLoader(data.Dataset):
-    """docstring for brainWebLoader"""
+class mrbrainsLoader_new_ann(data.Dataset):
 
     def __init__(self, root, split="train"):
-        # root = '/data/home/ywen/lk/datasets/brainweb/'
-        # root = 'datasets/brainweb/'
         self.root = root
         self.split = split
         self.n_classes = 4
         self.files = collections.defaultdict(list)
-        self.tf = transforms.Compose(
-            [
-                transforms.ToTensor(),
-                transforms.Normalize([0.196, 0.179, 0.323], [0.257, 0.257, 0.401])
-                # transforms.Normalize([0.196, 0.196, 0.196], [0.257, 0.257, 0.257])
-            ]
-        )
+        # self.tf = transforms.Compose(
+        #     [
+        #         transforms.ToTensor(),
+        #         transforms.Normalize([0.196, 0.179, 0.323], [0.257, 0.257, 0.401])
+        #     ]
+        # )
 
         for split in ["train", "val", "trainval"]:
             path = pjoin(self.root, split + '.txt')
@@ -41,30 +37,50 @@ class brainwebLoader(data.Dataset):
 
     def __getitem__(self, index):
         img_name = self.files[self.split][index]
-
-        # multi-modality
-        img_path = self.root + 'imgs/rgb/' + img_name + '.bmp'
-
-        # t1_path = self.root + 'imgs/t1/' + img_name + '.bmp'
-        # t2_path = self.root + 'imgs/t2/' + img_name + '.bmp'
-        # pd_path = self.root + 'imgs/pd/' + img_name + '.bmp'
+        # img_path = self.root + 'imgs/rgb/' + img_name + '.bmp'
+        t1_path = self.root + 'imgs/t1/' + img_name + '.bmp'
+        t2_path = self.root + 'imgs/t1ir/' + img_name + '.bmp'
+        pd_path = self.root + 'imgs/t2flair/' + img_name + '.bmp'
         lbl_path = self.root + 'gt/' + img_name + '.bmp'
 
         # np:(h,w,c)
-        img = m.imread(img_path)
+        # img = m.imread(img_path)
+        # t1 = m.imread(t1_path)
+        # t2 = m.imread(t2_path)
+        # pd = m.imread(pd_path)
+        img = m.imread(t1_path)
         lbl = m.imread(lbl_path)
+        # t1_g = m.imread(t1_path, flatten=True)
+        # t2_g = m.imread(t2_path, flatten=True)
+        # pd_g = m.imread(pd_path, flatten=True)
+        gray = m.imread(t1_path, flatten=True)
+
+        # newsize = 224
+        # t1 = m.imresize(t1, [newsize, newsize], interp='bilinear', mode=None)
+        # t2 = m.imresize(t2, [newsize, newsize], interp='bilinear', mode=None)
+        # pd = m.imresize(pd, [newsize, newsize], interp='bilinear', mode=None)
+        # lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
+
+        # img = np.stack((t1, t2, pd), axis=0)
+        img = np.stack((img, img, img), axis=0)
+        gray = np.array([gray])
+        # gray = np.stack((t1_g, t2_g, pd_g), axis=0)
+        img, gray, lbl = self.transform(img, gray, lbl)
+
+        # gray = img.convert('L')
+
+        return img, gray, lbl, img_name
 
 
-        img, lbl = self.transform(img, lbl)
-
-        return img, lbl, img_name
-
-
-    def transform(self, img, lbl):
-        img = self.tf(img)
+    def transform(self, img, gray, lbl):
+        # img = self.tf(img)
+        img = img.astype(float) / 255.0
+        img = torch.from_numpy(img).float()
+        gray = gray.astype(float) / 255.0
+        gray = torch.from_numpy(gray).float()
         lbl = torch.from_numpy(lbl).long()
 
-        return img, lbl
+        return img, gray, lbl
 
     def get_brainweb_colormap(self):
         return np.asarray([[0, 0, 0], [255, 255, 255], [92, 179, 179], [221, 218, 93]])
@@ -73,7 +89,7 @@ class brainwebLoader(data.Dataset):
         mask = mask.astype(np.uint8)
         label_mask = np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8)
         for ii, label in enumerate(self.get_brainweb_colormap()):
-            label_mask[np.where(np.all(mask == label, axis=-1))[:2]] = ii
+            label_mask[np.where((mask == (np.zeros((mask.shape[0], mask.shape[1]), dtype=np.uint8) + label)))] = ii
         label_mask = label_mask.astype(np.uint8)
         return label_mask
 
@@ -113,9 +129,10 @@ class brainwebLoader(data.Dataset):
 
 
 def debug_load():
-    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/brainweb/'
-    t_loader = brainwebLoader(
-        root,
+    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/mrbrains/'
+
+    t_loader = mrbrainsLoader_new_ann(
+		root,
 		split='trainval')
 
     n_classes = t_loader.n_classes
@@ -125,14 +142,13 @@ def debug_load():
 								  num_workers=4,
 								  shuffle=True)
 
-#####输出真值
-    # for (images, labels, img_name) in trainLoader:
-    #     # m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/imgs/rgb', '{}.bmp'.format(img_name)),images)
-    #
-    #     labels = np.squeeze(labels.data.numpy())
-    #     decoded = t_loader.decode_segmap(labels, plot=False)
-    #     m.imsave(pjoin('C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/trained_models/brainweb/', '{}.bmp'.format(img_name[0])), decoded)
-    #     print('.')
+    for (images, labels, img_name) in trainLoader:
+        # m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/dataset/brainweb/imgs/rgb', '{}.bmp'.format(img_name)),images)
+
+        labels = np.squeeze(labels.data.numpy())
+        decoded = t_loader.decode_segmap(labels, plot=False)
+        m.imsave(pjoin('/home/jwliu/disk/kxie/CNN_LSTM/result_image_when_training/mrbrains', '{}.bmp'.format(img_name[0])), decoded)
+        print('.')
 
         # tensor2numpy
         # print(img_name[0])

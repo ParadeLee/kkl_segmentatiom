@@ -76,7 +76,7 @@ Implementation code for UNet_Ctrans_CRDN.
 class UNet_Ctrans_CRDN(nn.Module):
     def __init__(
         self, feature_scale=4, n_classes=4, is_deconv=True, input_channel=3, is_batchnorm=True,
-            vis=False, img_size=240, decoder="LSTM", bias=True
+            vis=False, img_size=224, decoder="LSTM", bias=True
     ):
         super().__init__()
         self.is_deconv = is_deconv
