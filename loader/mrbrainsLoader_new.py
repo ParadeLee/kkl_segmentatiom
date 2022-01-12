@@ -11,11 +11,14 @@ from PIL import Image
 from torchvision import transforms
 
 
-class mrbrainsLoader_new_ann(data.Dataset):
+class mrbrainsLoader_new(data.Dataset):
 
     def __init__(self, root, split="train"):
         self.root = root
         self.split = split
+        self.resize = (256, 256)
+        self.pad_val = 0
+        self.seg_pad_val = 255
         self.n_classes = 4
         self.files = collections.defaultdict(list)
         # self.tf = transforms.Compose(
@@ -45,42 +48,27 @@ class mrbrainsLoader_new_ann(data.Dataset):
 
         # np:(h,w,c)
         # img = m.imread(img_path)
-        # t1 = m.imread(t1_path)
-        # t2 = m.imread(t2_path)
-        # pd = m.imread(pd_path)
-        img = m.imread(t1_path)
+        t1 = m.imread(t1_path)
+        t2 = m.imread(t2_path)
+        pd = m.imread(pd_path)
+        # img = m.imread(t1_path)
         lbl = m.imread(lbl_path)
-        # t1_g = m.imread(t1_path, flatten=True)
-        # t2_g = m.imread(t2_path, flatten=True)
-        # pd_g = m.imread(pd_path, flatten=True)
-        gray = m.imread(t1_path, flatten=True)
 
-        # newsize = 224
-        # t1 = m.imresize(t1, [newsize, newsize], interp='bilinear', mode=None)
-        # t2 = m.imresize(t2, [newsize, newsize], interp='bilinear', mode=None)
-        # pd = m.imresize(pd, [newsize, newsize], interp='bilinear', mode=None)
-        # lbl = m.imresize(lbl, [newsize, newsize], interp='bilinear', mode=None)
-
-        # img = np.stack((t1, t2, pd), axis=0)
-        img = np.stack((img, img, img), axis=0)
-        gray = np.array([gray])
-        # gray = np.stack((t1_g, t2_g, pd_g), axis=0)
-        img, gray, lbl = self.transform(img, gray, lbl)
-
-        # gray = img.convert('L')
-
-        return img, gray, lbl, img_name
+        img = np.stack((t1, t2, pd), axis=0)
+        # img = np.stack((img, img, img), axis=0)
+        img, lbl = self.transform(img, lbl)
 
 
-    def transform(self, img, gray, lbl):
+        return img, lbl, img_name
+
+
+    def transform(self, img, lbl):
         # img = self.tf(img)
         img = img.astype(float) / 255.0
         img = torch.from_numpy(img).float()
-        gray = gray.astype(float) / 255.0
-        gray = torch.from_numpy(gray).float()
         lbl = torch.from_numpy(lbl).long()
 
-        return img, gray, lbl
+        return img, lbl
 
     def get_brainweb_colormap(self):
         return np.asarray([[0, 0, 0], [255, 255, 255], [92, 179, 179], [221, 218, 93]])

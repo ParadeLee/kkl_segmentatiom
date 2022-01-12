@@ -4,7 +4,7 @@ from loader.mrbrainsLoader import mrbrainsLoader
 from loader.hvsmrLoader import hvsmrLoader
 from loader.mrbrainsLoader_new import mrbrainsLoader_new_ann
 from loader.brainwebLoader_new_ann import brainwebLoader_ann
-from loader.hvsmrLoader_new_ann import hvsmrLoader_ann
+from loader.hvsmrLoader_new import hvsmrLoader_ann
 
 def get_loader(name):
     """get_loader

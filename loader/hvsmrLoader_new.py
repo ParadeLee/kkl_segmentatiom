@@ -10,7 +10,7 @@ import mmcv
 
 
 
-class hvsmrLoader_ann(data.Dataset):
+class hvsmrLoader_new(data.Dataset):
     """
     docstring for hvsmrLoader
     segmentation of the blood pool and ventricular myocaedium
@@ -44,29 +44,25 @@ class hvsmrLoader_ann(data.Dataset):
 
         # np:(h,w,c)
         img = imageio.imread(img_path, as_gray=False, pilmode="RGB")
-        gray = imageio.imread(img_path, as_gray=True, pilmode="L")
         lbl = imageio.imread(lbl_path)
 
         padding_img = mmcv.impad(img, shape=self.resize, pad_val=self.pad_val)
-        padding_gray = mmcv.impad(gray, shape=self.resize, pad_val=self.pad_val)
-        padding_gray = np.array([padding_gray])
+
         padding_lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
 
 
-        img, gray, lbl = self.transform(padding_img, padding_gray, padding_lbl)
+        img, lbl = self.transform(padding_img, padding_lbl)
 
-        return img, gray, lbl, img_name
+        return img, lbl, img_name
 
 
-    def transform(self, img, gray, lbl):
+    def transform(self, img, lbl):
         img = img.transpose((2, 0, 1))
         img = img.astype(float) / 255.0
         img = torch.from_numpy(img).float()
-        gray = gray.astype(float) / 255.0
-        gray = torch.from_numpy(gray).float()
         lbl = torch.from_numpy(lbl).long()
 
-        return img, gray, lbl
+        return img, lbl
 
     def get_brainweb_colormap(self):
         """
