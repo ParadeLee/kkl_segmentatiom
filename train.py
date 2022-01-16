@@ -20,10 +20,6 @@ from metrics import runningScore, averageMeter
 from schedulers import get_scheduler
 from optimizers import get_optimizer
 
-# from models.UNetRLARDC import *
-
-from models.UNet_ANN import UNet_ANN
-
 
 def train(cfg, logger):
 
@@ -73,10 +69,9 @@ def train(cfg, logger):
     running_metrics_val = runningScore(n_classes, n_val)
 
     # Setup Model
-    # model = get_model(cfg["model"], n_classes).to(device)
-    model = UNet_ANN().to(device)
-    # model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
-    model = torch.nn.DataParallel(model, device_ids=[0])
+    model = get_model(cfg["model"], n_classes).to(device)
+    model = torch.nn.DataParallel(model, device_ids=[cfg["training"]["gpu_idx"]])
+    # model = torch.nn.DataParallel(model, device_ids=[0])
 
     # Setup Optimizer, lr_scheduler and Loss Function
     optimizer_cls = get_optimizer(cfg)
@@ -113,26 +108,26 @@ def train(cfg, logger):
     # Start Training
     val_loss_meter = averageMeter()
     time_meter = averageMeter()
-    best_pa = -100.0
+
     start_iter = 0
+    best_pa = -100.0
     best_dice = -100.0
     i = start_iter
     flag = True
 
     while i <= cfg["training"]["train_iters"] and flag:
-        for (images, gray, labels, img_name) in trainloader:
+        for (images, labels, img_name) in trainloader:
             i += 1
             start_ts = time.time()
             scheduler.step()
             model.train()
             images = images.to(device)
-            gray = gray.to(device)
             labels = labels.to(device)
 
             optimizer.zero_grad()
-            outputs, grad = model(images, gray)
+            outputs = model(images)
 
-            loss = loss_fn(input=outputs, grad=grad, target=labels)
+            loss = loss_fn(input=outputs, target=labels)
 
             loss.backward()
             optimizer.step()
@@ -157,13 +152,12 @@ def train(cfg, logger):
             if (i + 1) % cfg["training"]["val_interval"] == 0 or (i + 1) == cfg["training"]["train_iters"]:
                 model.eval()
                 with torch.no_grad():
-                    for i_val, (images_val, gray_val, labels_val, img_name_val) in tqdm(enumerate(valloader)):
+                    for i_val, (images_val, labels_val, img_name_val) in tqdm(enumerate(valloader)):
                         images_val = images_val.to(device)
-                        gray_val = gray_val.to(device)
                         labels_val = labels_val.to(device)
 
-                        outputs, grad = model(images_val, gray_val)
-                        val_loss = loss_fn(input=outputs, grad=grad, target=labels_val)
+                        outputs = model(images_val)
+                        val_loss = loss_fn(input=outputs, target=labels_val)
 
                         pred = outputs.data.max(1)[1].cpu().numpy()
                         gt = labels_val.data.cpu().numpy()

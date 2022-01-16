@@ -23,7 +23,6 @@ class MCTrans(nn.Module):
                  n_sa_layers=6,
                  in_channles=[64, 64, 128, 256, 512],
                  proj_idxs=(2, 3, 4),
-
                  ):
         super().__init__()
         self.nhead = nhead
