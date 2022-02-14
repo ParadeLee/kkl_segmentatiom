@@ -1,10 +1,10 @@
 model:
-    arch: SwinUnet
+    arch: MISS
 data:
-    dataset: BrainWeb_new
+    dataset: MRBrainS
     train_split: train
     val_split: val
-    path: datasets/brainweb/
+    path: /data/home/ywen/lk/datasets/mrbrains/
 
 training:
     gpu_idx: 0
@@ -21,7 +21,7 @@ training:
         name: 'cross_entropy'
     lr_schedule:
     resume:
-    model_dir: trained_models/SwinUnet
+    model_dir: /data/home/ywen/lk/kkl_seg2021/kkl_segmentatiom/trained_models/MISS
 
 testing:
     trained_model: trained_models/UCTransNet/UNetTRD_MRBrainS.pkl

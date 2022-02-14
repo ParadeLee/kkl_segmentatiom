@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 from torch.utils import data
 import scipy.misc as m
 from PIL import Image
-from torchvision import transforms
+import torchvision.transforms
+import mmcv
 
 
 class mrbrainsLoader_new(data.Dataset):
@@ -16,7 +17,7 @@ class mrbrainsLoader_new(data.Dataset):
     def __init__(self, root, split="train"):
         self.root = root
         self.split = split
-        self.resize = (256, 256)
+        self.resize = (224, 224)
         self.pad_val = 0
         self.seg_pad_val = 255
         self.n_classes = 4
@@ -51,9 +52,19 @@ class mrbrainsLoader_new(data.Dataset):
         t1 = m.imread(t1_path)
         t2 = m.imread(t2_path)
         pd = m.imread(pd_path)
-        # img = m.imread(t1_path)
+        H, W = t1.shape[0:2]
+        rsize = 224
+        # bbox = np.array([(H-rsize)/2, (W-rsize)/2, (H+rsize)/2, (W+rsize)/2])
+        bbox = np.array([8, 8, 231, 231])
+        t1 = mmcv.imcrop(t1, bbox)
+        t2 = mmcv.imcrop(t2, bbox)
+        pd = mmcv.imcrop(pd, bbox)
+        # t1 = mmcv.impad(t1, shape=self.resize, pad_val=self.pad_val)
+        # t2 = mmcv.impad(t2, shape=self.resize, pad_val=self.pad_val)
+        # pd = mmcv.impad(pd, shape=self.resize, pad_val=self.pad_val)
         lbl = m.imread(lbl_path)
-
+        # lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
+        lbl = mmcv.imcrop(lbl, bbox)
         img = np.stack((t1, t2, pd), axis=0)
         # img = np.stack((img, img, img), axis=0)
         img, lbl = self.transform(img, lbl)
@@ -117,9 +128,10 @@ class mrbrainsLoader_new(data.Dataset):
 
 
 def debug_load():
-    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/mrbrains/'
+    # root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/mrbrains/'
+    root = 'C:/Users/parade/Desktop/kkl_segmentatiom/datasets/mrbrains/'
 
-    t_loader = mrbrainsLoader_new_ann(
+    t_loader = mrbrainsLoader_new(
 		root,
 		split='trainval')
 
