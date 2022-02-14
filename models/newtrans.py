@@ -120,7 +120,7 @@ class Attention(nn.Module):
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (self.num_head, self.attention_head_size)
-        x = x.view(*new_x_shape)
+        x = x.view(*new_x_shape)  # 在变量前加*号代表解包的意思，new_x_shape是一个元组
         return x
 
     def forward(self, x):

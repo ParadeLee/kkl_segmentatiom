@@ -147,7 +147,7 @@ class Attention(nn.Module):
 
         self.query_layer = nn.Linear(self.dim, self.all_head_size)
         self.key_layer = nn.Linear(self.dim, self.all_head_size)
-        self.value_layer = nn.Linear(self.dim, self.all_head_size)
+        # self.value_layer = nn.Linear(self.dim, self.all_head_size)
 
         self.out = nn.Linear(self.dim, self.dim)
         self.softmax = nn.Softmax(dim=-1)
