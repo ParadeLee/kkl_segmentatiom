@@ -2,7 +2,7 @@ import copy
 # from .axialnet import *
 from .CRDN_old import UNetRNN
 from .SwinUNet import SwinTransformerSys
-
+from .MISSFormer import MISSFormer
 
 
 def get_model(model_dict, n_classes, version=None):
@@ -16,6 +16,8 @@ def get_model(model_dict, n_classes, version=None):
                       is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
     elif name == "SwinUnet":
         model = model()
+    elif name == "MISS":
+        model = model()
     else:
         pass
     return model
@@ -26,7 +28,8 @@ def _get_model_instance(name):
     try:
         return {
             "UNetDRNN": UNetRNN,
-            "SwinUnet": SwinTransformerSys
+            "SwinUnet": SwinTransformerSys,
+            "MISS": MISSFormer
         }[name]
     except:
         raise ("Model {} not available".format(name))

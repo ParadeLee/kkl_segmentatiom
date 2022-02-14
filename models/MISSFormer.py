@@ -353,7 +353,7 @@ class MyDecoderLayer(nn.Module):
         return out
 
 class MISSFormer(nn.Module):
-    def __init__(self, num_classes=9, token_mlp_mode="mix_skip", encoder_pretrained=True):
+    def __init__(self, num_classes=4, token_mlp_mode="mix_skip", encoder_pretrained=True):
         super().__init__()
     
         reduction_ratios = [8, 4, 2, 1]
