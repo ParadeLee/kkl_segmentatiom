@@ -3,6 +3,7 @@ import copy
 from .CRDN_old import UNetRNN
 from .SwinUNet import SwinTransformerSys
 from .MISSFormer import MISSFormer
+from .MTUNet import MTUNet
 
 
 def get_model(model_dict, n_classes, version=None):
@@ -18,6 +19,8 @@ def get_model(model_dict, n_classes, version=None):
         model = model()
     elif name == "MISS":
         model = model()
+    elif name == "MTUnet":
+        model = model()
     else:
         pass
     return model
@@ -29,7 +32,8 @@ def _get_model_instance(name):
         return {
             "UNetDRNN": UNetRNN,
             "SwinUnet": SwinTransformerSys,
-            "MISS": MISSFormer
+            "MISS": MISSFormer,
+            "MTUnet": MTUNet,
         }[name]
     except:
         raise ("Model {} not available".format(name))

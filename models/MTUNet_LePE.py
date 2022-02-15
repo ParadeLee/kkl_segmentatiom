@@ -147,7 +147,8 @@ class Attention(nn.Module):
 
         self.query_layer = nn.Linear(self.dim, self.all_head_size)
         self.key_layer = nn.Linear(self.dim, self.all_head_size)
-        self.value_layer = nn.Linear(self.dim, self.all_head_size)
+        # self.value_layer = nn.Linear(self.dim, self.all_head_size)
+
 
         self.out = nn.Linear(self.dim, self.dim)
         self.softmax = nn.Softmax(dim=-1)
@@ -381,13 +382,13 @@ class Stem(nn.Module):
         super(Stem, self).__init__()
         self.model = U_encoder()
         self.trans_dim = ConvBNReLU(256, 256, 1, 1, 0)  #out_dim, model_dim
-        self.position_embedding = nn.Parameter(torch.zeros((1, 784, 256)))
+        self.position_embedding = nn.Parameter(torch.zeros((1, 786, 256)))
 
     def forward(self, x):
-        x, features = self.model(x)  # (1, 512, 30, 30)
-        x = self.trans_dim(x)  # (B, C, H, W) (1, 256, 30, 30)
-        x = x.flatten(2)  # (B, H, N)  (1, 256, 30*30)
-        x = x.transpose(-2, -1)  #  (B, N, H)  (1, 900, 256)
+        x, features = self.model(x)  # (1, 512, 28, 28)
+        x = self.trans_dim(x)  # (B, C, H, W) (1, 256, 28, 28)
+        x = x.flatten(2)  # (B, H, N)  (1, 256, 28*28)
+        x = x.transpose(-2, -1)  #  (B, N, H)  (1, 786, 256)
         x = x + self.position_embedding
         return x, features  #(B, N, H)
 
@@ -483,12 +484,12 @@ class MTUNet(nn.Module):
     def forward(self, x):
         if x.size()[1] == 1:
             x = x.repeat(1, 3, 1, 1)
-        x, features = self.stem(x)  #(B, N, C) (1, 196, 256)
+        x, features = self.stem(x)  #(B, N, C) (1, 786, 256)
         skips = []
         for i in range(len(self.encoder)):
             x, skip = self.encoder[i](x)
             skips.append(skip)
-            B, C, H, W = x.shape  #  (1, 512, 8, 8)
+            B, C, H, W = x.shape  #  (1, 512, 28, 28)
             x = x.permute(0, 2, 3, 1).contiguous().view(B, -1, C)  # (B, N, C)
         x = self.bottleneck(x)  # (1, 25, 1024)
         B, N, C = x.shape
