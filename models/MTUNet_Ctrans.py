@@ -6,6 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
+from models.UCtransBlock.UCtrans import ChannelTransformer
 
 
 class ConvBNReLU(nn.Module):  # 卷积BN和激活函数
@@ -58,11 +59,11 @@ class DoubleConv(nn.Module):
 class U_encoder(nn.Module):
     def __init__(self):
         super(U_encoder, self).__init__()
-        self.res1 = DoubleConv(3, 64)
+        self.res1 = DoubleConv(3, 32)
         self.pool1 = nn.MaxPool2d(2)
-        self.res2 = DoubleConv(64, 128)
+        self.res2 = DoubleConv(32, 64)
         self.pool2 = nn.MaxPool2d(2)
-        self.res3 = DoubleConv(128, 256)
+        self.res3 = DoubleConv(64, 128)
         self.pool3 = nn.MaxPool2d(2)
 
     def forward(self, x):
@@ -84,22 +85,22 @@ class U_encoder(nn.Module):
 class U_decoder(nn.Module):
     def __init__(self):
         super(U_decoder, self).__init__()
-        self.trans1 = nn.ConvTranspose2d(512, 256, 2, stride=2)
-        self.res1 = DoubleConv(512, 256)
-        self.trans2 = nn.ConvTranspose2d(256, 128, 2, stride=2)
-        self.res2 = DoubleConv(256, 128)
-        self.trans3 = nn.ConvTranspose2d(128, 64, 2, stride=2)
-        self.res3 = DoubleConv(128, 64)
+        self.trans1 = nn.ConvTranspose2d(256, 128, 2, stride=2)
+        self.res1 = DoubleConv(256, 128)
+        self.trans2 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.res2 = DoubleConv(128, 64)
+        self.trans3 = nn.ConvTranspose2d(64, 32, 2, stride=2)
+        self.res3 = DoubleConv(64, 32)
 
     def forward(self, x, feature):
 
-        x = self.trans1(x)  # (56, 56, 256)
+        x = self.trans1(x)
         x = torch.cat((feature[2], x), dim=1)
-        x = self.res1(x)  # (56, 56, 256)
-        x = self.trans2(x)  # (112, 112, 128)
+        x = self.res1(x)
+        x = self.trans2(x)
         x = torch.cat((feature[1], x), dim=1)
-        x = self.res2(x)  # (112, 112, 128)
-        x = self.trans3(x)  # (224, 224, 64)
+        x = self.res2(x)
+        x = self.trans3(x)
         x = torch.cat((feature[0], x), dim=1)
         x = self.res3(x)
         return x
@@ -147,8 +148,7 @@ class Attention(nn.Module):
 
         self.query_layer = nn.Linear(self.dim, self.all_head_size)
         self.key_layer = nn.Linear(self.dim, self.all_head_size)
-        # self.value_layer = nn.Linear(self.dim, self.all_head_size)
-
+        self.value_layer = nn.Linear(self.dim, self.all_head_size)
 
         self.out = nn.Linear(self.dim, self.dim)
         self.softmax = nn.Softmax(dim=-1)
@@ -381,16 +381,16 @@ class Stem(nn.Module):
     def __init__(self):
         super(Stem, self).__init__()
         self.model = U_encoder()
-        self.trans_dim = ConvBNReLU(256, 256, 1, 1, 0)  #out_dim, model_dim
-        self.position_embedding = nn.Parameter(torch.zeros((1, 786, 256)))
+        self.trans_dim = ConvBNReLU(128, 128, 1, 1, 0)  #out_dim, model_dim
+        self.position_embedding = nn.Parameter(torch.zeros((1, 784, 128)))
 
     def forward(self, x):
-        x, features = self.model(x)  # (1, 512, 28, 28)
-        x = self.trans_dim(x)  # (B, C, H, W) (1, 256, 28, 28)
-        x = x.flatten(2)  # (B, H, N)  (1, 256, 28*28)
-        x = x.transpose(-2, -1)  #  (B, N, H)  (1, 786, 256)
+        x, features = self.model(x)
+        x = self.trans_dim(x)
+        x = x.flatten(2)
+        x = x.transpose(-2, -1)
         x = x + self.position_embedding
-        return x, features  #(B, N, H)
+        return x, features
 
 
 class encoder_block(nn.Module):
@@ -463,7 +463,7 @@ class decoder_block(nn.Module):
 
 
 class MTUNet(nn.Module):
-    def __init__(self, out_ch=4):
+    def __init__(self, out_ch=4, img_size=224):
         super(MTUNet, self).__init__()
         self.stem = Stem()
         self.encoder = nn.ModuleList()
@@ -479,17 +479,17 @@ class MTUNet(nn.Module):
             dim = configs["decoder"][i]
             self.decoder.append(decoder_block(dim, False))
         self.decoder.append(decoder_block(configs["decoder"][-1], True))
-        self.SegmentationHead = nn.Conv2d(64, out_ch, 1)
+        self.SegmentationHead = nn.Conv2d(32, out_ch, 1)
 
     def forward(self, x):
         if x.size()[1] == 1:
             x = x.repeat(1, 3, 1, 1)
-        x, features = self.stem(x)  #(B, N, C) (1, 786, 256)
+        x, features = self.stem(x)  #(B, N, C) (1, 196, 256)
         skips = []
         for i in range(len(self.encoder)):
             x, skip = self.encoder[i](x)
             skips.append(skip)
-            B, C, H, W = x.shape  #  (1, 512, 28, 28)
+            B, C, H, W = x.shape  #  (1, 512, 8, 8)
             x = x.permute(0, 2, 3, 1).contiguous().view(B, -1, C)  # (B, N, C)
         x = self.bottleneck(x)  # (1, 25, 1024)
         B, N, C = x.shape
@@ -509,9 +509,8 @@ class MTUNet(nn.Module):
 configs = {
     "win_size": 4,
     "head": 8,
-    "axis": [28, 16, 8],
-    "encoder": [256, 512],
-    "bottleneck": 1024,
-    "decoder": [1024, 512],
-    "decoder_stem": [(256, 512), (256, 256), (128, 64), 32]
+    # "axis": [28, 16, 8],
+    "encoder": [128, 256],
+    "bottleneck": 512,
+    "decoder": [512, 256],
 }

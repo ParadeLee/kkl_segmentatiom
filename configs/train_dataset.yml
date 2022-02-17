@@ -1,5 +1,5 @@
 model:
-    arch: MTUnet
+    arch: new
 data:
     dataset: MRBrainS
     train_split: train
@@ -21,7 +21,7 @@ training:
         name: 'cross_entropy'
     lr_schedule:
     resume:
-    model_dir: ./trained_models/MTUnet
+    model_dir: ./trained_models/new
 
 testing:
     trained_model: trained_models/UCTransNet/UNetTRD_MRBrainS.pkl

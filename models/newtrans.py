@@ -322,20 +322,20 @@ class Decoder_stem(nn.Module):
         x = self.block(x, features)
         return x
 
-class encoder_block1(nn.Module):
-    def __init__(self, dim, split_size=7, heads=8, mlp_ratio=4,
+class encoder_block(nn.Module):
+    def __init__(self, dim, resolution, split_size=7, heads=8, mlp_ratio=4,
                  qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,drop_path_rate=0.,
                  norm_layer=nn.LayerNorm):
         super().__init__()
-        depth=[4]
+        depth = [4, 4, 4]
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, np.sum(depth))]
-        self.norm1 = nn.LayerNorm(dim)
+        self.norm = nn.LayerNorm(dim)
         self.block = nn.ModuleList([
             CSWinBlock(
-                dim=dim, num_heads=heads, resolution=224 // 8, mlp_ratio=mlp_ratio,
+                dim=dim, num_heads=heads, resolution=resolution, mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size,
                 drop=drop_rate, attn_drop=attn_drop_rate,
-                drop_path=dpr[i], norm_layer=norm_layer)
+                drop_path=dpr[np.sum(depth[:1])+i], norm_layer=norm_layer)
             for i in range(depth[0])])
         self.downsample = ConvBNReLU(dim, dim*2, 2, stride=2, padding=0)
 
@@ -347,18 +347,129 @@ class encoder_block1(nn.Module):
         x = x.view(B, H, W, C).permute(0, 3, 1, 2)
         skip = x
         x = self.downsample(x)
+        B, C, H, W = x.shape
+        x = x.permute(0, 2, 3, 1).contiguous().view(B, -1, C)
         return x, skip
 
+class decoder_block(nn.Module):
+    def __init__(self, dim, flag, resolution, split_size=7, heads=8, mlp_ratio=4,
+                 qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,drop_path_rate=0.,
+                 norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.flag = flag
+        depth = [4, 4, 4]
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, np.sum(depth))]
+        self.attn1 = nn.ModuleList([
+            CSWinBlock(
+                dim=dim//2, num_heads=heads, resolution=resolution, mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size,
+                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop_path=dpr[np.sum(depth[:1]) + i], norm_layer=norm_layer)
+            for i in range(depth[1])])
+        self.attn2 = nn.ModuleList([
+            CSWinBlock(
+                dim=dim, num_heads=heads, resolution=resolution, mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size,
+                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop_path=dpr[np.sum(depth[:1]) + i], norm_layer=norm_layer)
+            for i in range(depth[1])])
+        if not self.flag:
+            self.block = nn.ModuleList([
+                nn.ConvTranspose2d(dim,
+                                   dim // 2,
+                                   kernel_size=2,
+                                   stride=2,
+                                   padding=0),
+                nn.Conv2d(dim, dim // 2, kernel_size=1, stride=1),
+            ])
+        else:
+            self.block = nn.ModuleList([
+                nn.ConvTranspose2d(dim,
+                                   dim // 2,
+                                   kernel_size=2,
+                                   stride=2,
+                                   padding=0),
+            ])
 
+    def forward(self, x, skip):
+        if not self.flag:
+            x = self.block[0](x)
+            x = torch.cat((x, skip), dim=1)
+            x = self.block[1](x)
+            x = x.permute(0, 2, 3, 1)
+            B, H, W, C = x.shape
+            x = x.view(B, -1, C)
+            for attn in self.attn1:
+                x = attn(x)
+            B, N, C = x.shape
+            x = x.view(B, int(np.sqrt(N)), int(np.sqrt(N)),
+                       C).permute(0, 3, 1, 2)
+        else:
+            x = self.block[0](x)
+            x = torch.cat((x, skip), dim=1)
+            x = x.permute(0, 2, 3, 1)
+            B, H, W, C = x.shape
+            x = x.view(B, -1, C)
+            for attn in self.attn2:
+                x = attn(x)
+            B, N, C = x.shape
+            x = x.view(B, int(np.sqrt(N)), int(np.sqrt(N)),
+                       C).permute(0, 3, 1, 2)
+        return x
+
+class bottleneck(nn.Module):
+    def __init__(self, dim, resolution=224//32, split_size=7, heads=8, mlp_ratio=4,
+                 qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,drop_path_rate=0.,
+                 norm_layer=nn.LayerNorm):
+        super().__init__()
+        super().__init__()
+        depth = [4, 4, 4]
+        dpr = [x.item() for x in torch.linspace(0, drop_path_rate, np.sum(depth))]
+        self.norm = nn.LayerNorm(dim)
+        self.block = nn.ModuleList([
+            CSWinBlock(
+                dim=dim, num_heads=heads, resolution=resolution, mlp_ratio=mlp_ratio,
+                qkv_bias=qkv_bias, qk_scale=qk_scale, split_size=split_size,
+                drop=drop_rate, attn_drop=attn_drop_rate,
+                drop_path=dpr[np.sum(depth[:1]) + i], norm_layer=norm_layer)
+            for i in range(depth[2])])
+
+    def forward(self, x):
+        for block in self.block:
+            x = block(x)
+        B, N, C = x.shape
+        x = x.view(B, int(np.sqrt(N)), -1, C).permute(0, 3, 1, 2)
+        return x
 
 class newTrans(nn.Module):
-    def __init__(self, img_size=224, patch_size=4, in_chans=3, embed_dim=64, split_size=7,
+    def __init__(self, img_size=224, patch_size=4, in_chans=3, out_ch=4, embed_dim=64, split_size=7,
                  num_heads=8, mlp_ratio=4, qkv_bias=False, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0., hybrid_backbone=None, norm_layer=nn.LayerNorm, use_chk=False):
         super().__init__()
+        self.encoder_stem = Encoder_stem()
+        self.encoder_block1 = encoder_block(256, resolution=224//8)
+        self.encoder_block2 = encoder_block(512, resolution=224//16)
+        self.bottom = bottleneck(1024)
+
+        self.decoder_block2 = decoder_block(1024, False, resolution=224//16)
+        self.decoder_block1 = decoder_block(512, True, resolution=224//8)
+        self.decoder_stem = Decoder_stem()
+        self.SegmentionHead = nn.Conv2d(64, out_ch, 1)
+
+    def forward(self, x):
+        if x.size()[1] == 1:
+            x = x.repeat(1, 3, 1, 1)
+        x, features = self.encoder_stem(x)  # (B, N, C)
+        x, skip1 = self.encoder_block1(x)
+        x, skip2 = self.encoder_block2(x)
+        x = self.bottom(x)
+        x = self.decoder_block2(x, skip2)
+        x = self.decoder_block1(x, skip1)
+        x = self.decoder_stem(x, features)
+        x = self.SegmentionHead(x)
+        return x
 
 
-        self.
 
 
 

@@ -49,9 +49,12 @@ class hvsmrLoader_new(data.Dataset):
         padding_img = mmcv.impad(img, shape=self.resize, pad_val=self.pad_val)
 
         padding_lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
+        bbox = np.array([0, 0, 223, 223])
+        crop_img = mmcv.imcrop(padding_img, bbox)
+        crop_lbl = mmcv.imcrop(padding_lbl, bbox)
 
 
-        img, lbl = self.transform(padding_img, padding_lbl)
+        img, lbl = self.transform(crop_img, crop_lbl)
 
         return img, lbl, img_name
 
@@ -106,9 +109,10 @@ class hvsmrLoader_new(data.Dataset):
 
 
 def debug_load():
-    root = 'C:/Users/86130/Desktop/kkl_seg2021/kkl_segmentatiom/datasets/hvsmr2016/'
+    root = '/data/home/ywen/lk/datasets/hvsmr2016/'
+    # root = './datasets/hvsmr/'
 
-    t_loader = hvsmrLoader_ann(
+    t_loader = hvsmrLoader_new(
         root,
         split='trainval')
 
@@ -120,7 +124,7 @@ def debug_load():
     for (images, labels, img_name) in trainLoader:
         labels = np.squeeze(labels.data.numpy())
         decoded = t_loader.decode_segmap(labels, plot=False)
-        m.imsave(pjoin('{TODO: save_path}', '{}.bmp'.format(img_name[0])), decoded)
+        m.imsave(pjoin('/data/home/ywen/lk/kkl_seg2021/kkl_segmentatiom/trained_models/hvsmr/', '{}.bmp'.format(img_name[0])), decoded)
 
 
 if __name__ == '__main__':

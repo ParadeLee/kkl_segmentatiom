@@ -12,7 +12,6 @@ from tqdm import tqdm
 from os.path import join as pjoin
 import matplotlib.pyplot as plt
 import pandas as pd
-from models.UNetRLA import *
 
 def test(cfg):
 

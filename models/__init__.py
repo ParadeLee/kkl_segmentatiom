@@ -4,6 +4,7 @@ from .CRDN_old import UNetRNN
 from .SwinUNet import SwinTransformerSys
 from .MISSFormer import MISSFormer
 from .MTUNet import MTUNet
+from .newtrans import newTrans
 
 
 def get_model(model_dict, n_classes, version=None):
@@ -21,6 +22,8 @@ def get_model(model_dict, n_classes, version=None):
         model = model()
     elif name == "MTUnet":
         model = model()
+    elif name == "new":
+        model = model()
     else:
         pass
     return model
@@ -34,6 +37,7 @@ def _get_model_instance(name):
             "SwinUnet": SwinTransformerSys,
             "MISS": MISSFormer,
             "MTUnet": MTUNet,
+            "new": newTrans,
         }[name]
     except:
         raise ("Model {} not available".format(name))
