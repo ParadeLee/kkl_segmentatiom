@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.UCtransBlock.UCtrans import ChannelTransformer
+from .UCtransBlock.UCtrans import ChannelTransformer
 
 
 __all__ = ['UNet_Ctrans_CRDN']

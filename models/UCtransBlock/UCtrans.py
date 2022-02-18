@@ -70,7 +70,7 @@ class Attention_org(nn.Module):
     def __init__(self, vis, channel_num):
         super(Attention_org, self).__init__()
         self.vis = vis
-        self.KV_size = 240  # KV_size = Q1 + Q2 + Q3 + Q4 + Q5
+        self.KV_size = 576  # KV_size = Q1 + Q2 + Q3 + Q4
         self.channel_num = channel_num
         self.num_attention_heads = 4  # transformer.num_heads
 
@@ -86,7 +86,7 @@ class Attention_org(nn.Module):
             query2 = nn.Linear(channel_num[1], channel_num[1], bias=False)
             query3 = nn.Linear(channel_num[2], channel_num[2], bias=False)
             query4 = nn.Linear(channel_num[3], channel_num[3], bias=False)
-            key = nn.Linear( self.KV_size,  self.KV_size, bias=False)
+            key = nn.Linear(self.KV_size,  self.KV_size, bias=False)
             value = nn.Linear(self.KV_size,  self.KV_size, bias=False)
             self.query1.append(copy.deepcopy(query1))
             self.query2.append(copy.deepcopy(query2))
@@ -233,7 +233,7 @@ class Block_ViT(nn.Module):
     def __init__(self, vis, channel_num):
         super(Block_ViT, self).__init__()
         expand_ratio = 4
-        KV_size = 240  # 16+32+64+128
+        KV_size = 576  # 16+32+64+128
         self.attn_norm1 = LayerNorm(channel_num[0], eps=1e-6)
         self.attn_norm2 = LayerNorm(channel_num[1], eps=1e-6)
         self.attn_norm3 = LayerNorm(channel_num[2], eps=1e-6)
@@ -323,7 +323,7 @@ class Encoder(nn.Module):
 
 
 class ChannelTransformer(nn.Module):
-    def __init__(self, vis, img_size, channel_num=[64, 128, 256, 512], patchSize=[16, 8, 4, 2]):
+    def __init__(self, vis, img_size, channel_num, patchSize):
         # patchSize = [32, 16, 8, 4]
         super().__init__()
 

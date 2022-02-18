@@ -1,5 +1,5 @@
 model:
-    arch: new
+    arch: MTRNN
 data:
     dataset: MRBrainS
     train_split: train

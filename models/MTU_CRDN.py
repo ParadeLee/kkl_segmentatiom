@@ -6,7 +6,6 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-from .UCtransBlock.UCtrans import ChannelTransformer
 
 
 class ConvBNReLU(nn.Module):  # 卷积BN和激活函数
@@ -59,11 +58,11 @@ class DoubleConv(nn.Module):
 class U_encoder(nn.Module):
     def __init__(self):
         super(U_encoder, self).__init__()
-        self.res1 = DoubleConv(3, 32)
+        self.res1 = DoubleConv(3, 16)
         self.pool1 = nn.MaxPool2d(2)
-        self.res2 = DoubleConv(32, 64)
+        self.res2 = DoubleConv(16, 32)
         self.pool2 = nn.MaxPool2d(2)
-        self.res3 = DoubleConv(64, 128)
+        self.res3 = DoubleConv(32, 64)
         self.pool3 = nn.MaxPool2d(2)
 
     def forward(self, x):
@@ -79,19 +78,18 @@ class U_encoder(nn.Module):
         x = self.res3(x)
         features.append(x)
         x = self.pool3(x)
-
         return x, features
 
 
 class U_decoder(nn.Module):
     def __init__(self):
         super(U_decoder, self).__init__()
-        self.trans1 = nn.ConvTranspose2d(256, 128, 2, stride=2)
-        self.res1 = DoubleConv(256, 128)
-        self.trans2 = nn.ConvTranspose2d(128, 64, 2, stride=2)
-        self.res2 = DoubleConv(128, 64)
-        self.trans3 = nn.ConvTranspose2d(64, 32, 2, stride=2)
-        self.res3 = DoubleConv(64, 32)
+        self.trans1 = nn.ConvTranspose2d(128, 64, 2, stride=2)
+        self.res1 = DoubleConv(128, 64)
+        self.trans2 = nn.ConvTranspose2d(64, 32, 2, stride=2)
+        self.res2 = DoubleConv(64, 32)
+        self.trans3 = nn.ConvTranspose2d(32, 16, 2, stride=2)
+        self.res3 = DoubleConv(32, 16)
 
     def forward(self, x, feature):
 
@@ -105,6 +103,68 @@ class U_decoder(nn.Module):
         x = torch.cat((feature[0], x), dim=1)
         x = self.res3(x)
         return x
+
+class RDC(nn.Module):
+    def __init__(self, hidden_dim, kernel_size, bias, decoder='LSTM'):
+        """
+        Recurrent Decoding Cell (RDC) module.
+        :param hidden_dim:
+        :param kernel_size: conv kernel size
+        :param bias: if or not to add a bias term
+        :param decoder: <name> [options: 'vanilla, LSTM, GRU']
+        """
+        super(RDC, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.kernel_size = kernel_size
+        self.padding = kernel_size // 2, kernel_size // 2
+        self.bias = bias
+        self.decoder = decoder
+        self.gru_catconv = nn.Conv2d(self.hidden_dim * 2, self.hidden_dim * 2, self.kernel_size,
+                                     padding=self.padding, bias=self.bias)
+        self.gru_conv = nn.Conv2d(self.hidden_dim * 2, self.hidden_dim, self.kernel_size,
+                                  padding=self.padding, bias=self.bias)
+        self.lstm_catconv = nn.Conv2d(self.hidden_dim * 2, self.hidden_dim * 4, self.kernel_size,
+                                      padding=self.padding, bias=self.bias)
+        self.vanilla_conv = nn.Conv2d(self.hidden_dim * 2, self.hidden_dim, self.kernel_size,
+                                      padding=self.padding, bias=self.bias)
+
+    def forward(self, x_cur, h_pre, c_pre=None):
+        if self.decoder == "LSTM":
+            h_pre_up = F.interpolate(h_pre, size=[x_cur.size(2), x_cur.size(3)], mode='bilinear', align_corners=True) #interpolate函数表示上/下采样到给定size
+            c_pre_up = F.interpolate(c_pre, size=[x_cur.size(2), x_cur.size(3)], mode='bilinear', align_corners=True)
+            combined = torch.cat([h_pre_up, x_cur], dim=1)
+            combined_conv = self.lstm_catconv(combined)
+            cc_i, cc_f, cc_o, cc_g = torch.split(combined_conv, self.hidden_dim, dim=1)
+            i = torch.sigmoid(cc_i)
+            f = torch.sigmoid(cc_f)
+            o = torch.sigmoid(cc_o)
+            g = torch.tanh(cc_g)
+
+            c_cur = f * c_pre_up + i * g
+            h_cur = o * torch.tanh(c_cur)
+
+            return h_cur, c_cur
+
+        elif self.decoder == "GRU": #比LSTM少一个门控 实验结果却相当
+            h_pre_up = F.interpolate(h_pre, size=[x_cur.size(2), x_cur.size(3)], mode='bilinear', align_corners=True)
+
+            combined = torch.cat([h_pre_up, x_cur], dim=1)
+            combined_conv = self.gru_catconv(combined)
+            cc_r, cc_z = torch.split(combined_conv, self.hidden_dim, dim=1)
+            r = torch.sigmoid(cc_r)
+            z = torch.sigmoid(cc_z)
+            h_hat = torch.tanh(self.gru_conv(torch.cat([x_cur, r * h_pre_up], dim=1)))
+            h_cur = z * h_pre_up + (1 - z) * h_hat
+
+            return h_cur
+
+        elif self.decoder == "vanilla": #最基础的RNN
+            h_pre_up = F.interpolate(h_pre, size=[x_cur.size(2), x_cur.size(3)], mode='bilinear', align_corners=True)
+            combined = torch.cat([h_pre_up, x_cur], dim=1)
+            combined_conv = self.vanilla_conv(combined)
+            h_cur = torch.relu(combined_conv)
+
+            return h_cur
 
 
 class MEAttention(nn.Module):
@@ -378,12 +438,12 @@ class DecoderStem(nn.Module):
         return x
 
 
-class Stem(nn.Module):
+class encoder_stem(nn.Module):
     def __init__(self):
-        super(Stem, self).__init__()
+        super().__init__()
         self.model = U_encoder()
-        self.trans_dim = ConvBNReLU(128, 128, 1, 1, 0)  #out_dim, model_dim
-        self.position_embedding = nn.Parameter(torch.zeros((1, 784, 128)))
+        self.trans_dim = ConvBNReLU(64, 64, 1, 1, 0)  #out_dim, model_dim
+        self.position_embedding = nn.Parameter(torch.zeros((1, 784, 64)))
 
     def forward(self, x):
         x, features = self.model(x)
@@ -410,10 +470,10 @@ class encoder_block(nn.Module):
         h, w = int(np.sqrt(N)), int(np.sqrt(N))
         x = x.view(B, h, w, C).permute(0, 3, 1,
                                        2)  # (1, 256, 28, 28) B, C, H, W
-        skip = x
+        # skip = x
         x = self.block[2](x)  # (14, 14, 256)
-        return x, skip
-
+        # return x, skip
+        return x
 
 class decoder_block(nn.Module):
     def __init__(self, dim, flag):
@@ -444,7 +504,7 @@ class decoder_block(nn.Module):
     def forward(self, x, skip):
         if not self.flag:
             x = self.block[0](x)
-            x = F.interpolate(x, size=(skip.size(2), skip.size(3)), mode='bilinear', align_corners=True)
+            # x = F.interpolate(x, size=(skip.size(2), skip.size(3)), mode='bilinear', align_corners=True)
             x = torch.cat((x, skip), dim=1)
             x = self.block[1](x)
             x = x.permute(0, 2, 3, 1)
@@ -463,60 +523,162 @@ class decoder_block(nn.Module):
         return x
 
 
-class MTC(nn.Module):
-    def __init__(self, out_ch=4, img_size=224, vis=False):
-        super().__init__()
-        self.stem = Stem()
-        self.encoder = nn.ModuleList()
-        self.bottleneck = nn.Sequential(EAmodule(configs["bottleneck"]),
-                                        EAmodule(configs["bottleneck"]))
-        self.decoder = nn.ModuleList()
+# class MTUNet(nn.Module):
+#     def __init__(self, out_ch=4):
+#         super(MTUNet, self).__init__()
+#         self.stem = Stem()
+#         self.encoder = nn.ModuleList()
+#         self.bottleneck = nn.Sequential(EAmodule(configs["bottleneck"]),
+#                                         EAmodule(configs["bottleneck"]))
+#         self.decoder = nn.ModuleList()
+#
+#         self.decoder_stem = DecoderStem()
+#         for i in range(len(configs["encoder"])):
+#             dim = configs["encoder"][i]
+#             self.encoder.append(encoder_block(dim))
+#         for i in range(len(configs["decoder"]) - 1):
+#             dim = configs["decoder"][i]
+#             self.decoder.append(decoder_block(dim, False))
+#         self.decoder.append(decoder_block(configs["decoder"][-1], True))
+#         self.SegmentationHead = nn.Conv2d(64, out_ch, 1)
+#
+#     def forward(self, x):
+#         if x.size()[1] == 1:
+#             x = x.repeat(1, 3, 1, 1)
+#         x, features = self.stem(x)  #(B, N, C) (1, 196, 256)
+#         skips = []
+#         for i in range(len(self.encoder)):
+#             x, skip = self.encoder[i](x)
+#             skips.append(skip)
+#             B, C, H, W = x.shape  #  (1, 512, 8, 8)
+#             x = x.permute(0, 2, 3, 1).contiguous().view(B, -1, C)  # (B, N, C)
+#         x = self.bottleneck(x)  # (1, 25, 1024)
+#         B, N, C = x.shape
+#         x = x.view(B, int(np.sqrt(N)), -1, C).permute(0, 3, 1, 2)
+#         for i in range(len(self.decoder)):
+#             x = self.decoder[i](x,
+#                                 skips[len(self.decoder) - i - 1])  # (B, N, C)
+#             B, N, C = x.shape
+#             x = x.view(B, int(np.sqrt(N)), int(np.sqrt(N)),
+#                        C).permute(0, 3, 1, 2)
+#
+#         x = self.decoder_stem(x, features)
+#         x = self.SegmentationHead(x)
+#         return x
 
-        self.decoder_stem = DecoderStem()
+class MTRNN(nn.Module):
+    def __init__(self, out_ch=4, kernel_size=3, decoder="LSTM", bias=True):
+        super().__init__()
+        self.stem = encoder_stem()
+        self.encoder = nn.ModuleList()
+        self.n_classes = out_ch
+        self.kernel_size = kernel_size
+        self.decoder = decoder
+        self.bias = bias
+
         for i in range(len(configs["encoder"])):
             dim = configs["encoder"][i]
             self.encoder.append(encoder_block(dim))
-        for i in range(len(configs["decoder"]) - 1):
-            dim = configs["decoder"][i]
-            self.decoder.append(decoder_block(dim, False))
-        self.decoder.append(decoder_block(configs["decoder"][-1], True))
-        self.SegmentationHead = nn.Conv2d(32, out_ch, 1)
-        self.mtc = ChannelTransformer(vis, img_size=img_size//2,
-                                      channel_num=[64, 128, 128, 256],
-                                      patchSize=[16, 8, 4, 2]
-                                      )
 
-    def forward(self, x):
+        self.score_block1 = nn.Sequential(
+
+            nn.Conv2d(16, self.n_classes, 5, padding=2),
+            nn.BatchNorm2d(self.n_classes),
+            nn.ReLU(inplace=True)
+        )
+
+        self.score_block2 = nn.Sequential(
+            nn.Conv2d(32, self.n_classes, 5, padding=2),
+            nn.BatchNorm2d(self.n_classes),
+            nn.ReLU(inplace=True)
+        )
+
+        self.score_block3 = nn.Sequential(
+            nn.Conv2d(64, self.n_classes, 5, padding=2),
+            nn.BatchNorm2d(self.n_classes),
+            nn.ReLU(inplace=True)
+        )
+
+        self.score_block4 = nn.Sequential(
+            nn.Conv2d(128, self.n_classes, 5, padding=2),
+            nn.BatchNorm2d(self.n_classes),
+            nn.ReLU(inplace=True)
+        )
+
+        self.score_block5 = nn.Sequential(
+            nn.Conv2d(256, self.n_classes, 5, padding=2),
+            nn.BatchNorm2d(self.n_classes),
+            nn.ReLU(inplace=True)
+        )
+
+        # self.RDC1 = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+        # self.RDC2 = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+        # self.RDC3 = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+        # self.RDC4 = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+        # self.RDC5 = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+        self.RDC = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
+
+    def _init_cell_state(self, tensor):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # return torch.zeros(tensor.size()).cuda(0)
+        return torch.zeros(tensor.size()).to(device)
+
+    def forward(self, x, cell_state=None):
         if x.size()[1] == 1:
             x = x.repeat(1, 3, 1, 1)
         x, features = self.stem(x)  #(B, N, C) (1, 196, 256)
-        skips = []
         for i in range(len(self.encoder)):
-            x, skip = self.encoder[i](x)
-            skips.append(skip)
+            x = self.encoder[i](x)
+            features.append(x)
             B, C, H, W = x.shape  #  (1, 512, 8, 8)
             x = x.permute(0, 2, 3, 1).contiguous().view(B, -1, C)  # (B, N, C)
-        x = self.bottleneck(x)  # (1, 25, 1024)
-        B, N, C = x.shape
-        x = x.view(B, int(np.sqrt(N)), -1, C).permute(0, 3, 1, 2)
-        features[1], features[2], skips[0], skips[1], att_weights = self.mtc(features[1], features[2], skips[0], skips[1])
-        for i in range(len(self.decoder)):
-            x = self.decoder[i](x,
-                                skips[len(self.decoder) - i - 1])  # (B, N, C)
-            B, N, C = x.shape
-            x = x.view(B, int(np.sqrt(N)), int(np.sqrt(N)),
-                       C).permute(0, 3, 1, 2)
 
-        x = self.decoder_stem(x, features)
-        x = self.SegmentationHead(x)
-        return x
+        x1 = self.score_block5(features[4])  # 1/16,class
+        x2 = self.score_block4(features[3])  # 1/8,class
+        x3 = self.score_block3(features[2])  # 1/4,class
+        x4 = self.score_block2(features[1])  # 1/2,class
+        x5 = self.score_block1(features[0])  # 1,class
 
+        h0 = self._init_cell_state(x1)  # 1/16,512
+
+        # Decode
+        if self.decoder == "LSTM":
+            # init c0
+            if cell_state is not None:
+                raise NotImplementedError()
+            else:
+                c0 = self._init_cell_state(h0)
+
+            h1, c1 = self.RDC(x_cur=x1, h_pre=h0, c_pre=c0)  # 1/16,class
+            h2, c2 = self.RDC(x_cur=x2, h_pre=h1, c_pre=c1)  # 1/8,class
+            h3, c3 = self.RDC(x_cur=x3, h_pre=h2, c_pre=c2)  # 1/4,class
+            h4, c4 = self.RDC(x_cur=x4, h_pre=h3, c_pre=c3)  # 1/2,class
+            h5, c5 = self.RDC(x_cur=x5, h_pre=h4, c_pre=c4)  # 1,class
+
+
+        elif self.decoder == "GRU":
+            h1 = self.RDC(x_cur=x1, h_pre=h0)  # 1/16,class
+            h2 = self.RDC(x_cur=x2, h_pre=h1)  # 1/8,class
+            h3 = self.RDC(x_cur=x3, h_pre=h2)  # 1/4,class
+            h4 = self.RDC(x_cur=x4, h_pre=h3)  # 1/2,class
+            h5 = self.RDC(x_cur=x5, h_pre=h4)  # 1,class
+
+        elif self.decoder == "vanilla":
+            h1 = self.RDC(x_cur=x1, h_pre=h0)  # 1/16,class
+            h2 = self.RDC(x_cur=x2, h_pre=h1)  # 1/8,class
+            h3 = self.RDC(x_cur=x3, h_pre=h2)  # 1/4,class
+            h4 = self.RDC(x_cur=x4, h_pre=h3)  # 1/2,class
+            h5 = self.RDC(x_cur=x5, h_pre=h4)  # 1,class
+
+        else:
+            raise NotImplementedError
+
+        return h5
 
 configs = {
     "win_size": 4,
     "head": 8,
-    # "axis": [28, 16, 8],
-    "encoder": [128, 256],
-    "bottleneck": 512,
-    "decoder": [512, 256],
+    "encoder": [64, 128],
+    "bottleneck": 256,
+    "decoder": [256, 128],
 }
