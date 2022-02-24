@@ -13,10 +13,12 @@ from torchvision import transforms
 class mrbrainsLoader(data.Dataset):
 
     def __init__(self, root, split="train"):
+        root = 'datasets/hvsmr2016/'
         self.root = root
         self.split = split
         self.n_classes = 4
         self.files = collections.defaultdict(list)
+        size = (240, 240)
         # self.tf = transforms.Compose(
         #     [
         #         transforms.ToTensor(),

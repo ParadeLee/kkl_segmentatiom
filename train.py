@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from models import get_model
 from loss import get_loss_function
+from loss import create_losses
 from loader import get_loader
 from utils.utils import get_logger
 from metrics import runningScore, averageMeter
@@ -86,23 +87,23 @@ def train(cfg, logger):
     logger.info("Using loss {}".format(loss_fn))
 
     # Resume Trained Model
-    if cfg["training"]["resume"] is not None:
-        if os.path.isfile(cfg["training"]["resume"]):
-            logger.info(
-                "Loading model and optimizer from checkpoint '{}'".format(cfg["training"]["resume"])
-            )
-            checkpoint = torch.load(cfg["training"]["resume"])
-            model.load_state_dict(checkpoint["model_state"])
-            optimizer.load_state_dict(checkpoint["optimizer_state"])
-            scheduler.load_state_dict(checkpoint["scheduler_state"])
-            start_iter = checkpoint["epoch"]
-            logger.info(
-                "Loaded checkpoint '{}' (iter {})".format(
-                    cfg["training"]["resume"], checkpoint["epoch"]
-                )
-            )
-        else:
-            logger.info("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
+    # if cfg["training"]["resume"] is not None:
+    #     if os.path.isfile(cfg["training"]["resume"]):
+    #         logger.info(
+    #             "Loading model and optimizer from checkpoint '{}'".format(cfg["training"]["resume"])
+    #         )
+    #         checkpoint = torch.load(cfg["training"]["resume"])
+    #         model.load_state_dict(checkpoint["model_state"])
+    #         optimizer.load_state_dict(checkpoint["optimizer_state"])
+    #         scheduler.load_state_dict(checkpoint["scheduler_state"])
+    #         start_iter = checkpoint["epoch"]
+    #         logger.info(
+    #             "Loaded checkpoint '{}' (iter {})".format(
+    #                 cfg["training"]["resume"], checkpoint["epoch"]
+    #             )
+    #         )
+    #     else:
+    #         logger.info("No checkpoint found at '{}'".format(cfg["training"]["resume"]))
 
 
     # Start Training
@@ -114,7 +115,7 @@ def train(cfg, logger):
     best_dice = -100.0
     i = start_iter
     flag = True
-
+    criterion = create_losses.Total_loss(boundary=False)
     while i <= cfg["training"]["train_iters"] and flag:
         for (images, labels, img_name) in trainloader:
             i += 1
@@ -157,6 +158,7 @@ def train(cfg, logger):
                         labels_val = labels_val.to(device)
 
                         outputs = model(images_val)
+
                         val_loss = loss_fn(input=outputs, target=labels_val)
 
                         pred = outputs.data.max(1)[1].cpu().numpy()

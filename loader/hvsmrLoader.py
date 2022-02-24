@@ -14,7 +14,7 @@ class hvsmrLoader(data.Dataset):
     """
 
     def __init__(self, root, split="train"):
-        # root = '/data/home/ywen/lk/datasets/hvsmr2016/'
+        root = 'datasets/hvsmr2016/'
         self.root = root
         self.split = split
         self.n_classes = 3

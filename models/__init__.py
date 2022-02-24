@@ -1,7 +1,7 @@
 import copy
 # from .axialnet import *
-from .CRDN_old import UNetRNN
-from .SwinUNet import SwinTransformerSys
+from .CRDN_att import UNetRNN
+from .CRDN_old import UNetRNN as UR
 from .MISSFormer import MISSFormer
 from .MTUNet import MTUNet
 from .newtrans import newTrans
@@ -16,9 +16,8 @@ def get_model(model_dict, n_classes, version=None):
     param_dict.pop("arch")
 
     if name == "UNetRNN":
-        model = model(input_channel=3, n_classes=n_classes, kernel_size=3, feature_scale=4, decoder="LSTM", bias=True,
-                      is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
-    elif name == "SwinUnet":
+        model = model(input_channel=3, n_classes=n_classes, kernel_size=3, feature_scale=4, decoder="LSTM", bias=True)
+    elif name == "UR":
         model = model()
     elif name == "MISS":
         model = model()
@@ -39,8 +38,8 @@ def get_model(model_dict, n_classes, version=None):
 def _get_model_instance(name):
     try:
         return {
-            "UNetDRNN": UNetRNN,
-            "SwinUnet": SwinTransformerSys,
+            "UNetRNN": UNetRNN,
+            "UR": UR,
             "MISS": MISSFormer,
             "MTUnet": MTUNet,
             "new": newTrans,

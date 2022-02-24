@@ -1,9 +1,8 @@
 from loader.brainwebLoader_new import brainwebLoader_new
 from loader.brainwebLoader import brainwebLoader
-from loader.mrbrainsLoader_new import mrbrainsLoader_new
 from loader.hvsmrLoader import hvsmrLoader
+from loader.mrbrainsLoader import mrbrainsLoader
 
-from loader.hvsmrLoader_new import hvsmrLoader_new
 
 def get_loader(name):
     """get_loader
@@ -12,9 +11,8 @@ def get_loader(name):
     return {
         "BrainWeb": brainwebLoader,
         "BrainWeb_new": brainwebLoader_new,
-        "MRBrainS": mrbrainsLoader_new,
+        "MRBrainS": mrbrainsLoader,
         # "Brats": BratsLoader,
 		# 'Hyper': hyperLoader,
         "HVSMR": hvsmrLoader,
-        "HVSMR_new": hvsmrLoader_new,
     }[name]

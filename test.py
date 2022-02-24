@@ -5,6 +5,7 @@ import numpy as np
 import seaborn as sns
 import scipy.misc as m
 from torch.utils import data
+from models import get_model
 from loader import get_loader
 from utils import convert_state_dict
 from metrics import runningScore
@@ -12,6 +13,7 @@ from tqdm import tqdm
 from os.path import join as pjoin
 import matplotlib.pyplot as plt
 import pandas as pd
+import torch.nn.functional as F
 
 def test(cfg):
 
@@ -31,8 +33,8 @@ def test(cfg):
         num_workers=cfg["training"]["n_workers"]
     )
 
-    # model = get_model(cfg["model"], n_classes).to(device)
-    model = UNetRLA().to(device)
+    model = get_model(cfg["model"], n_classes).to(device)
+
     state = convert_state_dict(torch.load(cfg["testing"]["trained_model"], map_location=device)["model_state"])
     model.load_state_dict(state)
     model.eval()

@@ -48,9 +48,9 @@ class hyperLoader(data.Dataset):
         img = m.imread(img_path)
         lbl = m.imread(lbl_path)
         #print(np.array(img).shape)
-        newsize = 128
-        img = m.imresize(img,[newsize,newsize], interp='bilinear', mode=None)
-        lbl = m.imresize(lbl,[newsize,newsize], interp='bilinear', mode=None)
+        # newsize = 128
+        # img = m.imresize(img,[newsize,newsize], interp='bilinear', mode=None)
+        # lbl = m.imresize(lbl,[newsize,newsize], interp='bilinear', mode=None)
         
         img, lbl = self.transform(img, lbl)
         
