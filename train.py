@@ -162,6 +162,7 @@ def train(cfg, logger):
                         val_loss = loss_fn(input=outputs, target=labels_val)
 
                         pred = outputs.data.max(1)[1].cpu().numpy()
+
                         gt = labels_val.data.cpu().numpy()
 
                         running_metrics_val.update(gt, pred, i_val)
