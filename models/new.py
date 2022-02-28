@@ -147,10 +147,10 @@ class RDC(nn.Module):
 
             return h_cur
 
-class UNetDRNN(nn.Module):
+class ARNN(nn.Module):
 
     def __init__(self, input_channel, n_classes, kernel_size=3, feature_scale=4, decoder="vanilla", bias=True, is_deconv=True, is_batchnorm=True, selfeat=False, shift_n=5, auxseg=False):
-        super(UNetDRNN, self).__init__()
+        super().__init__()
         self.is_deconv = is_deconv
         self.input_channel = input_channel
         self.n_classes = n_classes
@@ -195,6 +195,102 @@ class UNetDRNN(nn.Module):
         self.flowconv5 = nn.Conv2d(64+128, 2, kernel_size=3, stride=1, padding=1)
         self.vanilla_conv5 = nn.Conv2d(64+128, 64, kernel_size=3, stride=1, padding=1)
 
+        # --------------------------- Depth Refinement Block -------------------------- #
+        # DRB 1
+        self.conv_refine1_1 = nn.Conv2d(64, 64, 3, padding=1)
+        self.bn_refine1_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine1_1 = nn.PReLU()
+        self.conv_refine1_2 = nn.Conv2d(64, 64, 3, padding=1)
+        self.bn_refine1_2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine1_2 = nn.PReLU()
+        self.conv_refine1_3 = nn.Conv2d(64, 64, 3, padding=1)
+        self.bn_refine1_3 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine1_3 = nn.PReLU()
+        self.down_2_1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.down_2_2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        # DRB 2
+        self.conv_refine2_1 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn_refine2_1 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine2_1 = nn.PReLU()
+        self.conv_refine2_2 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn_refine2_2 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine2_2 = nn.PReLU()
+        self.conv_refine2_3 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn_refine2_3 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine2_3 = nn.PReLU()
+        self.conv_r2_1 = nn.Conv2d(128, 64, 3, padding=1)
+        self.bn_r2_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_r2_1 = nn.PReLU()
+        # DRB 3
+        self.conv_refine3_1 = nn.Conv2d(256, 256, 3, padding=1)
+        self.bn_refine3_1 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine3_1 = nn.PReLU()
+        self.conv_refine3_2 = nn.Conv2d(256, 256, 3, padding=1)
+        self.bn_refine3_2 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine3_2 = nn.PReLU()
+        self.conv_refine3_3 = nn.Conv2d(256, 256, 3, padding=1)
+        self.bn_refine3_3 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine3_3 = nn.PReLU()
+        self.conv_r3_1 = nn.Conv2d(256, 64, 3, padding=1)
+        self.bn_r3_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_r3_1 = nn.PReLU()
+        # DRB 4
+        self.conv_refine4_1 = nn.Conv2d(512, 512, 3, padding=1)
+        self.bn_refine4_1 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine4_1 = nn.PReLU()
+        self.conv_refine4_2 = nn.Conv2d(512, 512, 3, padding=1)
+        self.bn_refine4_2 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine4_2 = nn.PReLU()
+        self.conv_refine4_3 = nn.Conv2d(512, 512, 3, padding=1)
+        self.bn_refine4_3 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine4_3 = nn.PReLU()
+        self.conv_r4_1 = nn.Conv2d(512, 64, 3, padding=1)
+        self.bn_r4_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_r4_1 = nn.PReLU()
+        # DRB 5
+        # self.conv_refine5_1 = nn.Conv2d(512, 512, 3, padding=1)
+        # self.bn_refine5_1 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        # self.relu_refine5_1 = nn.PReLU()
+        # self.conv_refine5_2 = nn.Conv2d(512, 512, 3, padding=1)
+        # self.bn_refine5_2 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        # self.relu_refine5_2 = nn.PReLU()
+        self.conv_refine5_3 = nn.Conv2d(1024, 1024, 3, padding=1)
+        self.bn_refine5_3 = nn.BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine5_3 = nn.PReLU()
+        self.conv_r5_1 = nn.Conv2d(1024, 64, 3, padding=1)
+        self.bn_r5_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_r5_1 = nn.PReLU()
+
+        # -----------------------------  Multi-scale  ----------------------------- #
+        # Add new structure: ASPP   Atrous spatial Pyramid Pooling     based on DeepLab v3
+        # part0:   1*1*64 Conv
+        self.conv5_conv_1 = nn.Conv2d(64, 64, 1, padding=0)  # size:  64*64*64
+        self.bn5_conv_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu5_conv_1 = nn.ReLU(inplace=True)
+        # part1:   3*3*64 Conv
+        self.conv5_conv = nn.Conv2d(64, 64, 3, padding=1)  # size:  64*64*64
+        self.bn5_conv = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu5_conv = nn.ReLU(inplace=True)
+        # part2:   3*3*64 (dilated=7) Atrous Conv
+        self.Atrous_conv_1 = nn.Conv2d(64, 64, 3, padding=7, dilation=7)  # size:  64*64*64
+        self.Atrous_bn5_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_relu_1 = nn.ReLU(inplace=True)
+        # part3:   3*3*64 (dilated=5) Atrous Conv
+        self.Atrous_conv_2 = nn.Conv2d(64, 64, 3, padding=5, dilation=5)  # size:  64*64*64
+        self.Atrous_bn5_2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_relu_2 = nn.ReLU(inplace=True)
+        # part4:   3*3*64 (dilated=3) Atrous Conv
+        self.Atrous_conv_5 = nn.Conv2d(64, 64, 3, padding=3, dilation=3)  # size:  64*64*64
+        self.Atrous_bn5_5 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_relu_5 = nn.ReLU(inplace=True)
+        # part5:   Max_pooling                                           # size:  16*16*64
+        self.Atrous_pooling = nn.MaxPool2d(2, stride=2, ceil_mode=True)
+        self.Atrous_conv_pool = nn.Conv2d(64, 64, 1, padding=0)
+        self.Atrous_bn_pool = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_relu_pool = nn.ReLU(inplace=True)
+
+
+
         ## -------------Score Block in Decoder--------------
         self.score_block1 = nn.Sequential(
             nn.Conv2d(filters[0], n_classes, 5, padding=2),
@@ -225,8 +321,14 @@ class UNetDRNN(nn.Module):
             nn.BatchNorm2d(self.n_classes),
             nn.ReLU(inplace=True)
         )
+        self.score_block_new = nn.Sequential(
+            nn.Conv2d(64*6, self.n_classes, 5, padding=2),
+            nn.BatchNorm2d(self.n_classes),
+            nn.ReLU(inplace=True)
+        )
 
-        self.convp2 = nn.Conv2d(self.n_classes * 5, self.n_classes, kernel_size=3, stride=1, padding=1)
+
+        self.convp2 = nn.Conv2d(self.n_classes * 2, self.n_classes, kernel_size=3, stride=1, padding=1)
         self.bnp2 = nn.BatchNorm2d(self.n_classes)
         self.relup2 = nn.ReLU(inplace=True)
         self.convp3 = nn.Conv2d(self.n_classes, self.n_classes, kernel_size=1, stride=1, padding=0)
@@ -326,19 +428,93 @@ class UNetDRNN(nn.Module):
             h5 = torch.relu(self.vanilla_conv5(torch.cat([h4_up, x5], dim=1)))
             # print(h5.size())#torch.Size([1, 64, 181, 181])
         # sys.exit(0)
+        # s5 = self.score_block1(h5)  # 1/16,class torch.Size([1, 4, 181, 181])
+        # s4 = self.score_block2(h4)  # 1/8,class torch.Size([1, 4, 90, 90])
+        # s3 = self.score_block3(h3)  # 1/4,class torch.Size([1, 4, 45, 45])
+        # s2 = self.score_block4(h2)  # 1/2,class torch.Size([1, 4, 22, 22])
+        # s1 = self.score_block5(h1)  # 1,class torch.Size([1, 4, 11, 11])
+
+        # -------- apply DRB --------- #
+        # drb 1
+        # d1_1 = self.relu_refine1_1(self.bn_refine1_1(self.conv_refine1_1(d1)))
+        # d1_2 = self.relu_refine1_2(self.bn_refine1_2(self.conv_refine1_2(d1_1)))
+        # d1_2 = d1_2 + h1  # (256x256)*64
+        d1_2 = self.down_2_2(self.down_2_1(h5))  # (64x64)*64
+        d1_2_0 = d1_2
+        d1_3 = self.relu_refine1_3(self.bn_refine1_3(self.conv_refine1_3(d1_2)))
+        drb1 = d1_2_0 + d1_3  # (64 x 64)*64
+
+        # drb 2
+        # d2_1 = self.relu_refine2_1(self.bn_refine2_1(self.conv_refine2_1(d2)))
+        # d2_2 = self.relu_refine2_2(self.bn_refine2_2(self.conv_refine2_2(d2_1)))
+        # d2_2 = d2_2 + h2  # (128x128)*128
+        d2_2 = self.down_2_1(h4)
+        d2_2_0 = d2_2
+        d2_3 = self.relu_refine2_3(self.bn_refine2_3(self.conv_refine2_3(d2_2)))
+        drb2 = d2_2_0 + d2_3
+        drb2 = self.relu_r2_1(self.bn_r2_1(self.conv_r2_1(drb2)))  # (64 x 64)*64
+
+        # drb 3
+        # d3_1 = self.relu_refine3_1(self.bn_refine3_1(self.conv_refine3_1(d3)))
+        # d3_2 = self.relu_refine3_2(self.bn_refine3_2(self.conv_refine3_2(d3_1)))
+        # d3_2 = d3_2 + h3  # (64 x 64)*256
+        d3_2_0 = h3
+        d3_3 = self.relu_refine3_3(self.bn_refine3_3(self.conv_refine3_3(h3)))
+        drb3 = d3_2_0 + d3_3
+        drb3 = self.relu_r3_1(self.bn_r3_1(self.conv_r3_1(drb3)))  # (64 x 64)*64
+
+        # drb 4
+        # d4_1 = self.relu_refine4_1(self.bn_refine4_1(self.conv_refine4_1(d4)))
+        # d4_2 = self.relu_refine4_2(self.bn_refine4_2(self.conv_refine4_2(d4_1)))
+        # d4_2 = d4_2 + h4  # (32 x 32)*512
+        d4_2 = F.upsample(h2, scale_factor=2, mode='bilinear')
+        d4_2_0 = d4_2
+        d4_3 = self.relu_refine4_3(self.bn_refine4_3(self.conv_refine4_3(d4_2)))
+        drb4 = d4_2_0 + d4_3
+        drb4 = self.relu_r4_1(self.bn_r4_1(self.conv_r4_1(drb4)))  # (64 x 64)*64
+
+        # drb 5
+        # d5_1 = self.relu_refine5_1(self.bn_refine5_1(self.conv_refine5_1(d5)))
+        # d5_2 = self.relu_refine5_2(self.bn_refine5_2(self.conv_refine5_2(d5_1)))
+        # d5_2 = d5_2 + h5  # (16 x 16)*64
+        d5_2 = F.upsample(h1, scale_factor=4, mode='bilinear')
+        d5_2_0 = d5_2
+        d5_3 = self.relu_refine5_3(self.bn_refine5_3(self.conv_refine5_3(d5_2)))
+        drb5 = d5_2_0 + d5_3
+        drb5 = self.relu_r5_1(self.bn_r5_1(self.conv_r5_1(drb5)))  # (64 x 64)*64
+
+        drb_fusion = drb1 + drb2 + drb3 + drb4 + drb5
+
+        # --------------------- obtain multi-scale ----------------------- #
+        f1 = self.relu5_conv_1(self.bn5_conv_1(self.conv5_conv_1(drb_fusion)))
+        f2 = self.relu5_conv(self.bn5_conv(self.conv5_conv(drb_fusion)))
+        f3 = self.Atrous_relu_1(self.Atrous_bn5_1(self.Atrous_conv_1(drb_fusion)))
+        f4 = self.Atrous_relu_2(self.Atrous_bn5_2(self.Atrous_conv_2(drb_fusion)))
+        f5 = self.Atrous_relu_5(self.Atrous_bn5_5(self.Atrous_conv_5(drb_fusion)))
+        f6 = F.upsample(
+            self.Atrous_relu_pool(
+                self.Atrous_bn_pool(self.Atrous_conv_pool(self.Atrous_pooling(self.Atrous_pooling(drb_fusion))))),
+            scale_factor=4, mode='bilinear')
+
+        fusion = torch.cat([f1, f2, f3, f4, f5, f6], dim=0)  # 6x64x64x64
+
+        input = torch.cat(torch.chunk(fusion, 6, dim=0), dim=1)  # 1x64x64x64
+
         s5 = self.score_block1(h5)  # 1/16,class torch.Size([1, 4, 181, 181])
-        s4 = self.score_block2(h4)  # 1/8,class torch.Size([1, 4, 90, 90])
-        s3 = self.score_block3(h3)  # 1/4,class torch.Size([1, 4, 45, 45])
-        s2 = self.score_block4(h2)  # 1/2,class torch.Size([1, 4, 22, 22])
-        s1 = self.score_block5(h1)  # 1,class torch.Size([1, 4, 11, 11])
 
+
+    # if self.decoder == "vanilla":
+    #         p1 = self.RDC(x_cur=s5, h_pre=s1)  # print(p1.size())#torch.Size([1, 4, 181, 181])
+    #         p2 = self.RDC(x_cur=s5, h_pre=s2)  # print(p2.size())#torch.Size([1, 4, 181, 181])
+    #         p3 = self.RDC(x_cur=s5, h_pre=s3)  # print(p3.size())#torch.Size([1, 4, 181, 181])
+    #         p4 = self.RDC(x_cur=s5, h_pre=s4)  # print(p4.size())#torch.Size([1, 4, 181, 181])
+
+        # out = torch.cat((p1, p2, p3, p4, s5), 1)
+
+        input = self.score_block_new(input)  # 1x4x64x64
         if self.decoder == "vanilla":
-            p1 = self.RDC(x_cur=s5, h_pre=s1)  # print(p1.size())#torch.Size([1, 4, 181, 181])
-            p2 = self.RDC(x_cur=s5, h_pre=s2)  # print(p2.size())#torch.Size([1, 4, 181, 181])
-            p3 = self.RDC(x_cur=s5, h_pre=s3)  # print(p3.size())#torch.Size([1, 4, 181, 181])
-            p4 = self.RDC(x_cur=s5, h_pre=s4)  # print(p4.size())#torch.Size([1, 4, 181, 181])
-
-        out = torch.cat((p1, p2, p3, p4, s5), 1)
+            p = self.RDC(x_cur=s5, h_pre=input)
+        out = torch.cat((p, s5), 1)
 
         out = self.convp2(out)
         out = self.relup2(self.bnp2(out))

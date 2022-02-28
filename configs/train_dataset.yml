@@ -1,10 +1,10 @@
 model:
-    arch: UNetRNN
+    arch: new
 data:
     dataset: MRBrainS
     train_split: train
     val_split: val
-    path:
+    path: datasets/mrbrains/
 
 training:
     gpu_idx: 0

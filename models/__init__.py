@@ -7,6 +7,8 @@ from .MTUNet import MTUNet
 from .newtrans import newTrans
 from .MTUNet_Ctrans import MTC
 from .MTU_CRDN import MTRNN
+from .myModule import UNetDRNN
+from .new import ARNN
 
 
 def get_model(model_dict, n_classes, version=None):
@@ -19,8 +21,12 @@ def get_model(model_dict, n_classes, version=None):
         model = model(input_channel=3, n_classes=n_classes, kernel_size=3, feature_scale=4, decoder="LSTM", bias=True)
     elif name == "UR":
         model = model()
-    elif name == "MISS":
-        model = model()
+    elif name == "sxx":
+        model = model(input_channel=3, n_classes=n_classes, kernel_size=3,
+                      feature_scale=4, decoder="vanilla", bias=True, is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
+    elif name == "new":
+        model = model(input_channel=3, n_classes=n_classes, kernel_size=3,
+                      feature_scale=4, decoder="vanilla", bias=True, is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
     elif name == "MTUnet":
         model = model()
     elif name == "new":
@@ -40,11 +46,12 @@ def _get_model_instance(name):
         return {
             "UNetRNN": UNetRNN,
             "UR": UR,
-            "MISS": MISSFormer,
             "MTUnet": MTUNet,
             "new": newTrans,
             "MTC": MTC,
             "MTRNN": MTRNN,
+            "sxx": UNetDRNN,
+            "new": ARNN
         }[name]
     except:
         raise ("Model {} not available".format(name))

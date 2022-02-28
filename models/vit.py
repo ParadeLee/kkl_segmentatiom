@@ -1,5 +1,7 @@
 import torch
-from torch import nn
+import sys
+from torch import nn, einsum
+import torch.nn.functional as F
 
 from einops import rearrange, repeat
 from einops.layers.torch import Rearrange
@@ -50,14 +52,15 @@ class Attention(nn.Module):
         ) if project_out else nn.Identity()
 
     def forward(self, x):
+        b, n, _, h = *x.shape, self.heads
         qkv = self.to_qkv(x).chunk(3, dim = -1)
-        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = self.heads), qkv)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h = h), qkv)
 
-        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+        dots = einsum('b h i d, b h j d -> b h i j', q, k) * self.scale
 
         attn = self.attend(dots)
 
-        out = torch.matmul(attn, v)
+        out = einsum('b h i j, b h j d -> b h i d', attn, v)
         out = rearrange(out, 'b h n d -> b n (h d)')
         return self.to_out(out)
 
@@ -79,6 +82,8 @@ class Transformer(nn.Module):
 class ViT(nn.Module):
     def __init__(self, *, image_size, patch_size, num_classes, dim, depth, heads, mlp_dim, pool = 'cls', channels = 3, dim_head = 64, dropout = 0., emb_dropout = 0.):
         super().__init__()
+        self.image_size = image_size
+        self.patch_size = patch_size
         image_height, image_width = pair(image_size)
         patch_height, patch_width = pair(patch_size)
 
@@ -108,17 +113,7 @@ class ViT(nn.Module):
         )
 
     def forward(self, img):
-        x = self.to_patch_embedding(img)
-        b, n, _ = x.shape
-
-        cls_tokens = repeat(self.cls_token, '() n d -> b n d', b = b)
-        x = torch.cat((cls_tokens, x), dim=1)
-        x += self.pos_embedding[:, :(n + 1)]
-        x = self.dropout(x)
-
-        x = self.transformer(x)
-
-        x = x.mean(dim = 1) if self.pool == 'mean' else x[:, 0]
-
-        x = self.to_latent(x)
-        return self.mlp_head(x)
+        x = self.to_patch_embedding(img)#torch.Size([1, 3, 256, 256])
+        x = self.transformer(x)#torch.Size([1, 256, 256])
+        x = rearrange(x, 'b c (h w) -> b c h w', h = self.patch_size, w = self.patch_size)
+        return x

@@ -8,17 +8,21 @@ import matplotlib.pyplot as plt
 from torch.utils import data
 import scipy.misc as m
 from torchvision import transforms
-
+import mmcv
 
 class mrbrainsLoader(data.Dataset):
 
     def __init__(self, root, split="train"):
-        root = 'datasets/hvsmr2016/'
+
         self.root = root
         self.split = split
         self.n_classes = 4
         self.files = collections.defaultdict(list)
-        size = (240, 240)
+
+        self.resize = (256, 256)
+        self.pad_val = 0
+        self.seg_pad_val = 255
+
         # self.tf = transforms.Compose(
         #     [
         #         transforms.ToTensor(),
@@ -50,6 +54,11 @@ class mrbrainsLoader(data.Dataset):
         t2 = m.imread(t2_path)
         pd = m.imread(pd_path)
         lbl = m.imread(lbl_path)
+
+        t1 = mmcv.impad(t1, shape=self.resize, pad_val=self.pad_val)
+        t2 = mmcv.impad(t2, shape=self.resize, pad_val=self.pad_val)
+        pd = mmcv.impad(pd, shape=self.resize, pad_val=self.pad_val)
+        lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
 
         # newsize = 224
         # t1 = m.imresize(t1, [newsize, newsize], interp='bilinear', mode=None)
