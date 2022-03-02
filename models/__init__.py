@@ -4,11 +4,11 @@ from .CRDN_att import UNetRNN
 from .CRDN_old import UNetRNN as UR
 from .MISSFormer import MISSFormer
 from .MTUNet import MTUNet
-from .newtrans import newTrans
 from .MTUNet_Ctrans import MTC
 from .MTU_CRDN import MTRNN
-from .myModule import UNetDRNN
+from .sxx import UNetDRNN
 from .new import ARNN
+from .new2 import ARNN2
 
 
 def get_model(model_dict, n_classes, version=None):
@@ -27,8 +27,9 @@ def get_model(model_dict, n_classes, version=None):
     elif name == "new":
         model = model(input_channel=3, n_classes=n_classes, kernel_size=3,
                       feature_scale=4, decoder="vanilla", bias=True, is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
-    elif name == "MTUnet":
-        model = model()
+    elif name == "new2":
+        model = model(input_channel=3, n_classes=n_classes, kernel_size=3,
+                      feature_scale=4, decoder="vanilla", bias=True, is_deconv=True, is_batchnorm=True, selfeat=True, shift_n=5, auxseg=True)
     elif name == "new":
         model = model()
     elif name == "MTC":
@@ -47,7 +48,7 @@ def _get_model_instance(name):
             "UNetRNN": UNetRNN,
             "UR": UR,
             "MTUnet": MTUNet,
-            "new": newTrans,
+            "new2": ARNN2,
             "MTC": MTC,
             "MTRNN": MTRNN,
             "sxx": UNetDRNN,

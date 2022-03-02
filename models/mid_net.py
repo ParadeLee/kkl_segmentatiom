@@ -18,7 +18,6 @@ from PIL import Image
 import time
 from torch.nn import init
 from models.vit import ViT
-from .UCtransBlock.UCtrans import ChannelTransformer
 np.set_printoptions(threshold=np.inf)
 
 newsize = 256
@@ -161,8 +160,6 @@ class ARNN(nn.Module):
         self.kernel_size = kernel_size
         self.bias = bias
         filters = [64, 128, 256, 512, 1024]
-        filters = [int(x / self.feature_scale) for x in filters]
-        # filters[0]=16 filters[1]=32 filters[2]=64 filters[3]=128 filters[4]=256
 
         ## -------------Encoder--------------
         self.conv1 = unetConv2(self.input_channel, filters[0], self.is_batchnorm)
@@ -179,85 +176,76 @@ class ARNN(nn.Module):
 
         self.conv5 = unetConv2(filters[3], filters[4], self.is_batchnorm)
 
-        # CTransBlock
-        vis = False
-        img_size = 256
-        patchSize = [32, 16, 8, 4]
-        self.mtc = ChannelTransformer(vis, img_size,
-                                      channel_num=[filters[0], filters[1], filters[2], filters[3]],
-                                      patchSize=patchSize,
-                                      )
-
         ## -------------Decoder--------------
         self.RDC = RDC(self.n_classes, self.kernel_size, bias=self.bias, decoder=self.decoder)
         self.RDC2 = RDC(self.n_classes*2, self.kernel_size, bias=self.bias, decoder=self.decoder)
 
-        self.flowconv1 = nn.Conv2d((filters[4]+256)*2, 2, kernel_size=3, stride=1, padding=1)
-        self.vanilla_conv1 = nn.Conv2d((filters[4]+256)*2, filters[4], kernel_size=3, stride=1, padding=1)
+        self.flowconv1 = nn.Conv2d((1024+256)*2, 2, kernel_size=3, stride=1, padding=1)
+        self.vanilla_conv1 = nn.Conv2d((1024+256)*2, 1024, kernel_size=3, stride=1, padding=1)
 
-        self.flowconv2 = nn.Conv2d(filters[4]+filters[3], 2, kernel_size=3, stride=1, padding=1)
-        self.vanilla_conv2 = nn.Conv2d(filters[4]+filters[3], filters[3], kernel_size=3, stride=1, padding=1)
+        self.flowconv2 = nn.Conv2d(1024+512, 2, kernel_size=3, stride=1, padding=1)
+        self.vanilla_conv2 = nn.Conv2d(1024+512, 512, kernel_size=3, stride=1, padding=1)
 
-        self.flowconv3 = nn.Conv2d(filters[2]+filters[3], 2, kernel_size=3, stride=1, padding=1)
-        self.vanilla_conv3 = nn.Conv2d(filters[2]+filters[3], filters[2], kernel_size=3, stride=1, padding=1)
+        self.flowconv3 = nn.Conv2d(256+512, 2, kernel_size=3, stride=1, padding=1)
+        self.vanilla_conv3 = nn.Conv2d(256+512, 256, kernel_size=3, stride=1, padding=1)
 
-        self.flowconv4 = nn.Conv2d(filters[1]+filters[2], 2, kernel_size=3, stride=1, padding=1)
-        self.vanilla_conv4 = nn.Conv2d(filters[1]+filters[2], filters[1], kernel_size=3, stride=1, padding=1)
+        self.flowconv4 = nn.Conv2d(128+256, 2, kernel_size=3, stride=1, padding=1)
+        self.vanilla_conv4 = nn.Conv2d(128+256, 128, kernel_size=3, stride=1, padding=1)
 
-        self.flowconv5 = nn.Conv2d(filters[0]+filters[1], 2, kernel_size=3, stride=1, padding=1)
-        self.vanilla_conv5 = nn.Conv2d(filters[0]+filters[1], filters[0], kernel_size=3, stride=1, padding=1)
+        self.flowconv5 = nn.Conv2d(64+128, 2, kernel_size=3, stride=1, padding=1)
+        self.vanilla_conv5 = nn.Conv2d(64+128, 64, kernel_size=3, stride=1, padding=1)
 
         # --------------------------- Depth Refinement Block -------------------------- #
         # DRB 1
-        # self.conv_refine1_1 = nn.Conv2d(64, 64, 3, padding=1)
-        # self.bn_refine1_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine1_1 = nn.PReLU()
-        # self.conv_refine1_2 = nn.Conv2d(64, 64, 3, padding=1)
-        # self.bn_refine1_2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine1_2 = nn.PReLU()
-        self.conv_refine1_3 = nn.Conv2d(filters[0], filters[0], 3, padding=1)
-        self.bn_refine1_3 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_refine1_1 = nn.Conv2d(64, 64, 3, padding=1)
+        self.bn_refine1_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine1_1 = nn.PReLU()
+        self.conv_refine1_2 = nn.Conv2d(64, 64, 3, padding=1)
+        self.bn_refine1_2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine1_2 = nn.PReLU()
+        self.conv_refine1_3 = nn.Conv2d(64, 64, 3, padding=1)
+        self.bn_refine1_3 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu_refine1_3 = nn.PReLU()
         self.down_2_1 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
         self.down_2_2 = nn.MaxPool2d(2, stride=2, ceil_mode=True)
         # DRB 2
-        # self.conv_refine2_1 = nn.Conv2d(128, 128, 3, padding=1)
-        # self.bn_refine2_1 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine2_1 = nn.PReLU()
-        # self.conv_refine2_2 = nn.Conv2d(128, 128, 3, padding=1)
-        # self.bn_refine2_2 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine2_2 = nn.PReLU()
-        self.conv_refine2_3 = nn.Conv2d(filters[1], filters[1], 3, padding=1)
-        self.bn_refine2_3 = nn.BatchNorm2d(filters[1], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_refine2_1 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn_refine2_1 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine2_1 = nn.PReLU()
+        self.conv_refine2_2 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn_refine2_2 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine2_2 = nn.PReLU()
+        self.conv_refine2_3 = nn.Conv2d(128, 128, 3, padding=1)
+        self.bn_refine2_3 = nn.BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True)
         self.relu_refine2_3 = nn.PReLU()
-        self.conv_r2_1 = nn.Conv2d(filters[1], filters[0], 3, padding=1)
-        self.bn_r2_1 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_r2_1 = nn.Conv2d(128, 64, 3, padding=1)
+        self.bn_r2_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu_r2_1 = nn.PReLU()
         # DRB 3
-        # self.conv_refine3_1 = nn.Conv2d(256, 256, 3, padding=1)
-        # self.bn_refine3_1 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine3_1 = nn.PReLU()
-        # self.conv_refine3_2 = nn.Conv2d(256, 256, 3, padding=1)
-        # self.bn_refine3_2 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine3_2 = nn.PReLU()
-        self.conv_refine3_3 = nn.Conv2d(filters[2], filters[2], 3, padding=1)
-        self.bn_refine3_3 = nn.BatchNorm2d(filters[2], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_refine3_1 = nn.Conv2d(256, 256, 3, padding=1)
+        self.bn_refine3_1 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine3_1 = nn.PReLU()
+        self.conv_refine3_2 = nn.Conv2d(256, 256, 3, padding=1)
+        self.bn_refine3_2 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine3_2 = nn.PReLU()
+        self.conv_refine3_3 = nn.Conv2d(256, 256, 3, padding=1)
+        self.bn_refine3_3 = nn.BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True)
         self.relu_refine3_3 = nn.PReLU()
-        self.conv_r3_1 = nn.Conv2d(filters[2], filters[0], 3, padding=1)
-        self.bn_r3_1 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_r3_1 = nn.Conv2d(256, 64, 3, padding=1)
+        self.bn_r3_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu_r3_1 = nn.PReLU()
         # DRB 4
-        # self.conv_refine4_1 = nn.Conv2d(512, 512, 3, padding=1)
-        # self.bn_refine4_1 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine4_1 = nn.PReLU()
-        # self.conv_refine4_2 = nn.Conv2d(512, 512, 3, padding=1)
-        # self.bn_refine4_2 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine4_2 = nn.PReLU()
-        self.conv_refine4_3 = nn.Conv2d(filters[3], filters[3], 3, padding=1)
-        self.bn_refine4_3 = nn.BatchNorm2d(filters[3], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_refine4_1 = nn.Conv2d(512, 512, 3, padding=1)
+        self.bn_refine4_1 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine4_1 = nn.PReLU()
+        self.conv_refine4_2 = nn.Conv2d(512, 512, 3, padding=1)
+        self.bn_refine4_2 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
+        self.relu_refine4_2 = nn.PReLU()
+        self.conv_refine4_3 = nn.Conv2d(512, 512, 3, padding=1)
+        self.bn_refine4_3 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
         self.relu_refine4_3 = nn.PReLU()
-        self.conv_r4_1 = nn.Conv2d(filters[3], filters[0], 3, padding=1)
-        self.bn_r4_1 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_r4_1 = nn.Conv2d(512, 64, 3, padding=1)
+        self.bn_r4_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu_r4_1 = nn.PReLU()
         # DRB 5
         # self.conv_refine5_1 = nn.Conv2d(512, 512, 3, padding=1)
@@ -266,39 +254,39 @@ class ARNN(nn.Module):
         # self.conv_refine5_2 = nn.Conv2d(512, 512, 3, padding=1)
         # self.bn_refine5_2 = nn.BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True)
         # self.relu_refine5_2 = nn.PReLU()
-        self.conv_refine5_3 = nn.Conv2d(filters[4], filters[4], 3, padding=1)
-        self.bn_refine5_3 = nn.BatchNorm2d(filters[4], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_refine5_3 = nn.Conv2d(1024, 1024, 3, padding=1)
+        self.bn_refine5_3 = nn.BatchNorm2d(1024, eps=1e-05, momentum=0.1, affine=True)
         self.relu_refine5_3 = nn.PReLU()
-        self.conv_r5_1 = nn.Conv2d(filters[4], filters[0], 3, padding=1)
-        self.bn_r5_1 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv_r5_1 = nn.Conv2d(1024, 64, 3, padding=1)
+        self.bn_r5_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu_r5_1 = nn.PReLU()
 
         # -----------------------------  Multi-scale  ----------------------------- #
         # Add new structure: ASPP   Atrous spatial Pyramid Pooling     based on DeepLab v3
         # part0:   1*1*64 Conv
-        self.conv5_conv_1 = nn.Conv2d(filters[0], filters[0], 1, padding=0)  # size:  64*64*64
-        self.bn5_conv_1 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv5_conv_1 = nn.Conv2d(64, 64, 1, padding=0)  # size:  64*64*64
+        self.bn5_conv_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu5_conv_1 = nn.ReLU(inplace=True)
         # part1:   3*3*64 Conv
-        self.conv5_conv = nn.Conv2d(filters[0], filters[0], 3, padding=1)  # size:  64*64*64
-        self.bn5_conv = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.conv5_conv = nn.Conv2d(64, 64, 3, padding=1)  # size:  64*64*64
+        self.bn5_conv = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.relu5_conv = nn.ReLU(inplace=True)
         # part2:   3*3*64 (dilated=7) Atrous Conv
-        self.Atrous_conv_1 = nn.Conv2d(filters[0], filters[0], 3, padding=7, dilation=7)  # size:  64*64*64
-        self.Atrous_bn5_1 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_conv_1 = nn.Conv2d(64, 64, 3, padding=7, dilation=7)  # size:  64*64*64
+        self.Atrous_bn5_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.Atrous_relu_1 = nn.ReLU(inplace=True)
         # part3:   3*3*64 (dilated=5) Atrous Conv
-        self.Atrous_conv_2 = nn.Conv2d(filters[0], filters[0], 3, padding=5, dilation=5)  # size:  64*64*64
-        self.Atrous_bn5_2 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_conv_2 = nn.Conv2d(64, 64, 3, padding=5, dilation=5)  # size:  64*64*64
+        self.Atrous_bn5_2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.Atrous_relu_2 = nn.ReLU(inplace=True)
         # part4:   3*3*64 (dilated=3) Atrous Conv
-        self.Atrous_conv_5 = nn.Conv2d(filters[0], filters[0], 3, padding=3, dilation=3)  # size:  64*64*64
-        self.Atrous_bn5_5 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_conv_5 = nn.Conv2d(64, 64, 3, padding=3, dilation=3)  # size:  64*64*64
+        self.Atrous_bn5_5 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.Atrous_relu_5 = nn.ReLU(inplace=True)
         # part5:   Max_pooling                                           # size:  16*16*64
         self.Atrous_pooling = nn.MaxPool2d(2, stride=2, ceil_mode=True)
-        self.Atrous_conv_pool = nn.Conv2d(filters[0], filters[0], 1, padding=0)
-        self.Atrous_bn_pool = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
+        self.Atrous_conv_pool = nn.Conv2d(64, 64, 1, padding=0)
+        self.Atrous_bn_pool = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
         self.Atrous_relu_pool = nn.ReLU(inplace=True)
 
 
@@ -334,7 +322,7 @@ class ARNN(nn.Module):
             nn.ReLU(inplace=True)
         )
         self.score_block_new = nn.Sequential(
-            nn.Conv2d(filters[0]*6, self.n_classes, 5, padding=2),
+            nn.Conv2d(64*6, self.n_classes, 5, padding=2),
             nn.BatchNorm2d(self.n_classes),
             nn.ReLU(inplace=True)
         )
@@ -403,9 +391,6 @@ class ARNN(nn.Module):
 
         x1 = torch.cat((x, x1), 1)
         h0 = self._init_cell_state(x1)  # 1/16,512
-
-        # CTransBlock
-        x5, x4, x3, x2, att_weights = self.mtc(x5, x4, x3, x2)
 
         if self.decoder == "vanilla":
             fuse = torch.cat((x1, self._upsample(h0, x1)), 1)

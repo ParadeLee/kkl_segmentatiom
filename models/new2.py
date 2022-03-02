@@ -148,7 +148,7 @@ class RDC(nn.Module):
 
             return h_cur
 
-class ARNN(nn.Module):
+class ARNN2(nn.Module):
 
     def __init__(self, input_channel, n_classes, kernel_size=3, feature_scale=4, decoder="vanilla", bias=True, is_deconv=True, is_batchnorm=True, selfeat=False, shift_n=5, auxseg=False):
         super().__init__()
