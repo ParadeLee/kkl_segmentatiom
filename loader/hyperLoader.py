@@ -11,15 +11,22 @@ import scipy.misc as m
 from torchvision import transforms
 import skimage
 from skimage import io,transform
+import mmcv
+
 
 class hyperLoader(data.Dataset):
     """docstring for hyperLoader"""
 
     def __init__(self, root, split="train"):
-        root = '/data/home/ywen/sxx/hyper/'
+        # root = '/data/home/ywen/sxx/hyper/'
         self.root = root
         self.split = split
         self.n_classes = 2
+
+        # self.resize = (1280, 1280)
+        # self.pad_val = 0
+        # self.seg_pad_val = 255
+
         self.files = collections.defaultdict(list)
         self.tf = transforms.Compose(
             [
@@ -47,6 +54,11 @@ class hyperLoader(data.Dataset):
         
         img = m.imread(img_path)
         lbl = m.imread(lbl_path)
+
+        # # padding
+        # img = mmcv.impad(img, shape=self.resize, pad_val=self.pad_val)
+        # lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
+
         #print(np.array(img).shape)
         # newsize = 128
         # img = m.imresize(img,[newsize,newsize], interp='bilinear', mode=None)

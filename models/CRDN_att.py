@@ -111,6 +111,8 @@ class UNetRNN(nn.Module):
         self.conv_s1 = nn.Conv2d(self.n_classes, self.n_classes, 1, padding=0)
         self.conv_s2 = nn.Conv2d(self.n_classes, 1, 1, padding=0)
 
+
+
         self.seghead = nn.Conv2d(self.n_classes, self.n_classes, 1, padding=0)
 
 

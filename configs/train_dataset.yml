@@ -1,10 +1,10 @@
 model:
-    arch: new
+    arch: mlpRnn
 data:
-    dataset: MRBrainS
+    dataset: HVSMR
     train_split: train
     val_split: val
-    path: datasets/mrbrains/
+    path: datasets/hvsmr/
 
 training:
     gpu_idx: 0

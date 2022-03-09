@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
-from .UCtransBlock.UCtrans import ChannelTransformer
+from .utils.UCtrans import ChannelTransformer
 
 
 class ConvBNReLU(nn.Module):  # 卷积BN和激活函数

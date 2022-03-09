@@ -20,7 +20,7 @@ class brainwebLoader_new(data.Dataset):
         # root = '/data/home/ywen/lk/datasets/brainweb/'
         # root = 'datasets/brainweb/'
         self.root = root
-        self.resize = (224, 224)
+        self.resize = (256, 256)
         self.pad_val = 0
         self.seg_pad_val = 255
         self.split = split
@@ -59,6 +59,7 @@ class brainwebLoader_new(data.Dataset):
         lbl = m.imread(lbl_path)
         padding_img = mmcv.impad(img, shape=self.resize, pad_val=self.pad_val)
         padding_lbl = mmcv.impad(lbl, shape=self.resize, pad_val=self.seg_pad_val)
+
 
         # padding_img = mmcv.impad_to_multiple(img, divisor=32, pad_val=0)
         # padding_lbl = mmcv.impad_to_multiple(lbl, divisor=32, pad_val=255)
