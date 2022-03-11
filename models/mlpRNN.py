@@ -2,23 +2,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import sys
 import numpy as np
-from torch.autograd import Variable
-import scipy.misc
-from os.path import join as pjoin
-from scipy import ndimage
-import math
-from torchvision import transforms
-import cv2
-import datetime
-from PIL import Image
-import time
+
 from torch.nn import init
 from models.vit import ViT
 from .utils.cbam import CBAM
 from models.convmlp import ConvMLP
-from .utils.cross_attention import NonLocalAttention
+
 
 
 np.set_printoptions(threshold=np.inf)
@@ -28,7 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # v = ViT(image_size=newsize, patch_size=16, num_classes=4, dim=16*16,
 #         depth=6, heads=16, mlp_dim=2048, channels=3, dropout=0.1, emb_dropout=0.1).to(device)
 
-mlp = ConvMLP(blocks=[2, 4, 2], dims=[128, 256, 512], mlp_ratios=[2, 2, 2], channels=64, n_conv_blocks=2)
+mlp = ConvMLP(blocks=[2, 4, 2], dims=[64, 128, 256], mlp_ratios=[2, 2, 2], channels=64, n_conv_blocks=2).to(device)
 
 class MultiFeatureProjection(nn.Module):
     def __init__(self, ):
@@ -187,31 +177,14 @@ class MlpRnn(nn.Module):
         self.maxpool4 = nn.MaxPool2d(kernel_size=2)
 
         self.conv5 = unetConv2(filters[3], filters[4], self.is_batchnorm)
-        #
-        # # CTransBlock
-        # vis = False
-        # img_size = 256
-        # patchSize = [32, 16, 8, 4]
-        # self.mtc = ChannelTransformer(vis, img_size,
-        #                               channel_num=[filters[0], filters[1], filters[2], filters[3]],
-        #                               patchSize=patchSize,
-        #                               )
 
-        # Spatial - wise Attention
-        self.sigmoid = nn.Sigmoid()
-        self.spatial_excitation = nn.Sequential(
-            nn.Conv2d(2, 1, kernel_size=7, stride=1, padding=3, bias=False),
-        )
+
 
         ## ------------Unet3+nolocal--------
         self.CatChannels = filters[0]
         self.CatBlocks = 5
         self.UpChannels = self.CatChannels * self.CatBlocks
 
-        self.CrossAttention4 = NonLocalAttention(channel=filters[3], fusionchannel=self.UpChannels, reduction=2)
-        self.CrossAttention3 = NonLocalAttention(channel=filters[2], fusionchannel=self.UpChannels, reduction=2)
-        self.CrossAttention2 = NonLocalAttention(channel=filters[1], fusionchannel=self.UpChannels, reduction=2)
-        self.CrossAttention1 = NonLocalAttention(channel=filters[0], fusionchannel=self.UpChannels, reduction=2)
 
         '''skip-4'''
         # h1->320*320, hd4->40*40, Pooling 8 times
@@ -364,8 +337,8 @@ class MlpRnn(nn.Module):
 
         # self.flowconv1 = nn.Conv2d((filters[4]+256)*2, 2, kernel_size=3, stride=1, padding=1)
         # self.vanilla_conv1 = nn.Conv2d((filters[4]+256)*2, filters[4], kernel_size=3, stride=1, padding=1)
-        self.flowconv1 = nn.Conv2d((filters[4] + 512) * 2, 2, kernel_size=3, stride=1, padding=1)
-        self.vanilla_conv1 = nn.Conv2d((filters[4] + 512) * 2, filters[4], kernel_size=3, stride=1, padding=1)
+        self.flowconv1 = nn.Conv2d((filters[4] + 256) * 2, 2, kernel_size=3, stride=1, padding=1)
+        self.vanilla_conv1 = nn.Conv2d((filters[4] + 256) * 2, filters[4], kernel_size=3, stride=1, padding=1)
 
         self.flowconv2 = nn.Conv2d(filters[4]+filters[3], 2, kernel_size=3, stride=1, padding=1)
         self.vanilla_conv2 = nn.Conv2d(filters[4]+filters[3], filters[3], kernel_size=3, stride=1, padding=1)
@@ -389,12 +362,7 @@ class MlpRnn(nn.Module):
 
         # --------------------------- Depth Refinement Block -------------------------- #
         # DRB 1
-        # self.conv_refine1_1 = nn.Conv2d(64, 64, 3, padding=1)
-        # self.bn_refine1_1 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine1_1 = nn.PReLU()
-        # self.conv_refine1_2 = nn.Conv2d(64, 64, 3, padding=1)
-        # self.bn_refine1_2 = nn.BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True)
-        # self.relu_refine1_2 = nn.PReLU()
+
         self.conv_refine1_3 = nn.Conv2d(filters[0], filters[0], 3, padding=1)
         self.bn_refine1_3 = nn.BatchNorm2d(filters[0], eps=1e-05, momentum=0.1, affine=True)
         self.relu_refine1_3 = nn.PReLU()
@@ -539,14 +507,7 @@ class MlpRnn(nn.Module):
     def _init_cell_state(self, tensor):
         return torch.zeros(tensor.size()).to(device)
 
-    def Spatial_attention(self, featmap):
-        avg_out = torch.mean(featmap, dim=1, keepdim=True)
-        max_out, _ = torch.max(featmap, dim=1, keepdim=True)
-        cat = torch.cat([avg_out, max_out], dim=1)
-        spa_add = self.spatial_excitation(cat)
-        spa_add = self.sigmoid(spa_add)
-        out = torch.mul(featmap, spa_add)
-        return out
+
 
     def _flow_align_module(self, featmap_front, featmap_latter, flow):
         B, C, H, W = featmap_latter.size()
@@ -568,13 +529,13 @@ class MlpRnn(nn.Module):
         return output
 
     def forward(self, inputs):
-        # print(inputs.size())#torch.Size([1, 3, 256, 256])
-        ## -------------Transformer-------------
-        # img = F.upsample(inputs, size=(newsize, newsize), mode='bilinear')
-        # x = v(img)  # torch.Size([1, 256, 16, 16])
+        print(inputs.size())#torch.Size([1, 3, 256, 256])
+        # -------------Transformer-------------
+        img = F.upsample(inputs, size=(newsize, newsize), mode='bilinear')
+        x = v(img)  # torch.Size([1, 256, 16, 16])
 
         ## --------ConvMLP-----------------------
-        x = mlp(inputs)
+        # x = mlp(inputs)
 
         ## -------------Encoder-------------
         x5 = self.conv1(inputs)  # x1->[1, 64, 256, 256]
@@ -623,11 +584,8 @@ class MlpRnn(nn.Module):
         hd1 = self.relu1d_1(self.bn1d_1(self.conv1d_1(
             torch.cat((h1_Cat_hd1, hd2_UT_hd1, hd3_UT_hd1, hd4_UT_hd1, hd5_UT_hd1), 1))))  # hd1->320*320*UpChannels
 
-        x5_f, x4_f, x3_f, x2_f, x1_conv = hd1, hd2, hd3, hd4, hd5
-        x2 = self.CrossAttention4(x2, x2_f)
-        x3 = self.CrossAttention3(x3, x3_f)
-        x4 = self.CrossAttention2(x4, x4_f)
-        x5 = self.CrossAttention1(x5, x5_f)
+        x5, x4, x3, x2, x1_conv = hd1, hd2, hd3, hd4, hd5
+
 
         [_, _, h, w] = x1_conv.size()
         x = F.upsample(x, size=(h, w), mode='bilinear')
@@ -635,125 +593,55 @@ class MlpRnn(nn.Module):
         x1 = torch.cat((x, x1_conv), 1)
         h0 = self._init_cell_state(x1)  # 1/16,512
 
-        if self.decoder == "vanilla":
-            fuse = torch.cat((x1, self._upsample(h0, x1)), 1)
-            flow = self.flowconv1(fuse)
-            h0 = self._flow_align_module(x1, h0, flow)
-            h0_up = F.interpolate(h0, size=[x1.size(2), x1.size(3)], mode='bilinear', align_corners=True)
-            h1 = self.cbam1(torch.relu(self.vanilla_conv1(torch.cat([h0_up, x1], dim=1))))
-            # print(h1.size())#torch.Size([1, 1024, 11, 11])
 
-            fuse = torch.cat((x2, self._upsample(h1, x2)), 1)
-            flow = self.flowconv2(fuse)
-            h1 = self._flow_align_module(x2, h1, flow)
-            h1_up = F.interpolate(h1, size=[x2.size(2), x2.size(3)], mode='bilinear', align_corners=True)
-            h2 = self.cbam2(torch.relu(self.vanilla_conv2(torch.cat([h1_up, x2], dim=1))))
-            # print(h2.size())#torch.Size([1, 512, 22, 22])
+        fuse = torch.cat((x1, self._upsample(h0, x1)), 1)
+        flow = self.flowconv1(fuse)
+        h0 = self._flow_align_module(x1, h0, flow)
+        h0_up = F.interpolate(h0, size=[x1.size(2), x1.size(3)], mode='bilinear', align_corners=True)
+        h1 = self.cbam1(torch.relu(self.vanilla_conv1(torch.cat([h0_up, x1], dim=1))))
+        # print(h1.size())#torch.Size([1, 1024, 11, 11])
 
-            fuse = torch.cat((x3, self._upsample(h2, x3)), 1)
-            flow = self.flowconv3(fuse)
-            h2 = self._flow_align_module(x3, h2, flow)
-            h2_up = F.interpolate(h2, size=[x3.size(2), x3.size(3)], mode='bilinear', align_corners=True)
-            h3 = self.cbam3(torch.relu(self.vanilla_conv3(torch.cat([h2_up, x3], dim=1))))
-            # print(h3.size())#torch.Size([1, 256, 45, 45])
+        fuse = torch.cat((x2, self._upsample(h1, x2)), 1)
+        flow = self.flowconv2(fuse)
+        h1 = self._flow_align_module(x2, h1, flow)
+        h1_up = F.interpolate(h1, size=[x2.size(2), x2.size(3)], mode='bilinear', align_corners=True)
+        h2 = self.cbam2(torch.relu(self.vanilla_conv2(torch.cat([h1_up, x2], dim=1))))
+        # print(h2.size())#torch.Size([1, 512, 22, 22])
 
-            fuse = torch.cat((x4, self._upsample(h3, x4)), 1)
-            flow = self.flowconv4(fuse)
-            h3 = self._flow_align_module(x4, h3, flow)
-            h3_up = F.interpolate(h3, size=[x4.size(2), x4.size(3)], mode='bilinear', align_corners=True)
-            h4 = self.cbam4(torch.relu(self.vanilla_conv4(torch.cat([h3_up, x4], dim=1))))
-            # print(h4.size())#torch.Size([1, 128, 90, 90])
+        fuse = torch.cat((x3, self._upsample(h2, x3)), 1)
+        flow = self.flowconv3(fuse)
+        h2 = self._flow_align_module(x3, h2, flow)
+        h2_up = F.interpolate(h2, size=[x3.size(2), x3.size(3)], mode='bilinear', align_corners=True)
+        h3 = self.cbam3(torch.relu(self.vanilla_conv3(torch.cat([h2_up, x3], dim=1))))
+        # print(h3.size())#torch.Size([1, 256, 45, 45])
 
-            fuse = torch.cat((x5, self._upsample(h4, x5)), 1)
-            flow = self.flowconv5(fuse)
-            h4 = self._flow_align_module(x5, h4, flow)
-            h4_up = F.interpolate(h4, size=[x5.size(2), x5.size(3)], mode='bilinear', align_corners=True)
-            h5 = self.cbam5(torch.relu(self.vanilla_conv5(torch.cat([h4_up, x5], dim=1))))
-            # print(h5.size())#torch.Size([1, 64, 181, 181])
-        # sys.exit(0)
-        # s5 = self.score_block1(h5)  # 1/16,class torch.Size([1, 4, 181, 181])
-        # s4 = self.score_block2(h4)  # 1/8,class torch.Size([1, 4, 90, 90])
-        # s3 = self.score_block3(h3)  # 1/4,class torch.Size([1, 4, 45, 45])
-        # s2 = self.score_block4(h2)  # 1/2,class torch.Size([1, 4, 22, 22])
-        # s1 = self.score_block5(h1)  # 1,class torch.Size([1, 4, 11, 11])
+        fuse = torch.cat((x4, self._upsample(h3, x4)), 1)
+        flow = self.flowconv4(fuse)
+        h3 = self._flow_align_module(x4, h3, flow)
+        h3_up = F.interpolate(h3, size=[x4.size(2), x4.size(3)], mode='bilinear', align_corners=True)
+        h4 = self.cbam4(torch.relu(self.vanilla_conv4(torch.cat([h3_up, x4], dim=1))))
+        # print(h4.size())#torch.Size([1, 128, 90, 90])
 
-        # -------- apply DRB --------- #
-        # drb 1
-        # d1_1 = self.relu_refine1_1(self.bn_refine1_1(self.conv_refine1_1(d1)))
-        # d1_2 = self.relu_refine1_2(self.bn_refine1_2(self.conv_refine1_2(d1_1)))
-        # d1_2 = d1_2 + h1  # (256x256)*64
-        d1_2 = F.interpolate(h5, size=[h3.size(2), h3.size(3)], mode='bilinear', align_corners=True)
-        d1_2_0 = d1_2
-        d1_3 = self.relu_refine1_3(self.bn_refine1_3(self.conv_refine1_3(d1_2)))
-        drb1 = d1_2_0 + d1_3  # (64 x 64)*64
+        fuse = torch.cat((x5, self._upsample(h4, x5)), 1)
+        flow = self.flowconv5(fuse)
+        h4 = self._flow_align_module(x5, h4, flow)
+        h4_up = F.interpolate(h4, size=[x5.size(2), x5.size(3)], mode='bilinear', align_corners=True)
+        h5 = self.cbam5(torch.relu(self.vanilla_conv5(torch.cat([h4_up, x5], dim=1))))
+        # print(h5.size())#torch.Size([1, 64, 181, 181])
 
-        # drb 2
-        # d2_1 = self.relu_refine2_1(self.bn_refine2_1(self.conv_refine2_1(d2)))
-        # d2_2 = self.relu_refine2_2(self.bn_refine2_2(self.conv_refine2_2(d2_1)))
-        # d2_2 = d2_2 + h2  # (128x128)*128
-        d2_2 = F.interpolate(h4, size=[h3.size(2), h3.size(3)], mode='bilinear', align_corners=True)
-        d2_2_0 = d2_2
-        d2_3 = self.relu_refine2_3(self.bn_refine2_3(self.conv_refine2_3(d2_2)))
-        drb2 = d2_2_0 + d2_3
-        drb2 = self.relu_r2_1(self.bn_r2_1(self.conv_r2_1(drb2)))  # (64 x 64)*64
-
-        # drb 3
-        # d3_1 = self.relu_refine3_1(self.bn_refine3_1(self.conv_refine3_1(d3)))
-        # d3_2 = self.relu_refine3_2(self.bn_refine3_2(self.conv_refine3_2(d3_1)))
-        # d3_2 = d3_2 + h3  # (64 x 64)*256
-        d3_2_0 = h3
-        d3_3 = self.relu_refine3_3(self.bn_refine3_3(self.conv_refine3_3(h3)))
-        drb3 = d3_2_0 + d3_3
-        drb3 = self.relu_r3_1(self.bn_r3_1(self.conv_r3_1(drb3)))  # (64 x 64)*64
-
-        # drb 4
-        # d4_1 = self.relu_refine4_1(self.bn_refine4_1(self.conv_refine4_1(d4)))
-        # d4_2 = self.relu_refine4_2(self.bn_refine4_2(self.conv_refine4_2(d4_1)))
-        # d4_2 = d4_2 + h4  # (32 x 32)*512
-        d4_2 = F.interpolate(h2, size=[h3.size(2), h3.size(3)], mode='bilinear', align_corners=True)
-        d4_2_0 = d4_2
-        d4_3 = self.relu_refine4_3(self.bn_refine4_3(self.conv_refine4_3(d4_2)))
-        drb4 = d4_2_0 + d4_3
-        drb4 = self.relu_r4_1(self.bn_r4_1(self.conv_r4_1(drb4)))  # (64 x 64)*64
-
-        # drb 5
-        # d5_1 = self.relu_refine5_1(self.bn_refine5_1(self.conv_refine5_1(d5)))
-        # d5_2 = self.relu_refine5_2(self.bn_refine5_2(self.conv_refine5_2(d5_1)))
-        # d5_2 = d5_2 + h5  # (16 x 16)*64
-        d5_2 = F.interpolate(h1, size=[h3.size(2), h3.size(3)], mode='bilinear', align_corners=True)
-        d5_2_0 = d5_2
-        d5_3 = self.relu_refine5_3(self.bn_refine5_3(self.conv_refine5_3(d5_2)))
-        drb5 = d5_2_0 + d5_3
-        drb5 = self.relu_r5_1(self.bn_r5_1(self.conv_r5_1(drb5)))  # (64 x 64)*64
-
-        drb_fusion = drb1 + drb2 + drb3 + drb4 + drb5
-
-        # --------------------- obtain multi-scale ----------------------- #
-        f1 = self.relu5_conv_1(self.bn5_conv_1(self.conv5_conv_1(drb_fusion)))
-        f2 = self.relu5_conv(self.bn5_conv(self.conv5_conv(drb_fusion)))
-        f3 = self.Atrous_relu_1(self.Atrous_bn5_1(self.Atrous_conv_1(drb_fusion)))
-        f4 = self.Atrous_relu_2(self.Atrous_bn5_2(self.Atrous_conv_2(drb_fusion)))
-        f5 = self.Atrous_relu_5(self.Atrous_bn5_5(self.Atrous_conv_5(drb_fusion)))
-        f6 = F.upsample(
-            self.Atrous_relu_pool(
-                self.Atrous_bn_pool(self.Atrous_conv_pool(self.Atrous_pooling(self.Atrous_pooling(drb_fusion))))),
-            size=[f1.size(2), f1.size(3)], mode='bilinear')
-
-        fusion = torch.cat([f1, f2, f3, f4, f5, f6], dim=0)  # 6x64x64x64
-
-        input = torch.cat(torch.chunk(fusion, 6, dim=0), dim=1)  # 1x64x64x64
 
         s5 = self.score_block1(h5)  # 1/16,class torch.Size([1, 4, 181, 181])
-        input = self.score_block_new(input)  # 1x4x64x64
-        s5 = self.Spatial_attention(s5)
-        input = self.Spatial_attention(input)
+        s4 = self.score_block2(h4)  # 1/8,class torch.Size([1, 4, 90, 90])
+        s3 = self.score_block3(h3)  # 1/4,class torch.Size([1, 4, 45, 45])
+        s2 = self.score_block4(h2)  # 1/2,class torch.Size([1, 4, 22, 22])
+        s1 = self.score_block5(h1)  # 1,class torch.Size([1, 4, 11, 11])
 
-        p = self.RDC(x_cur=s5, h_pre=input)
+        f0 = self._init_cell_state(s1)
 
-        out = torch.cat((p, s5), 1)
+        f1 = self.RDC(x_cur=s1, h_pre=f0)  # 1/16,class
+        f2 = self.RDC(x_cur=s2, h_pre=f1)  # 1/8,class
+        f3 = self.RDC(x_cur=s3, h_pre=f2)  # 1/4,class
+        f4 = self.RDC(x_cur=s4, h_pre=f3)  # 1/2,class
+        f5 = self.RDC(x_cur=s5, h_pre=f4)  # 1,class
 
-        out = self.convp2(out)
-        out = self.relup2(self.bnp2(out))
-
-
-        return out
+        return f5

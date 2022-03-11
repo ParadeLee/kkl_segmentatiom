@@ -1,5 +1,5 @@
 model:
-    arch: mlpRnn
+    arch: kktrans
 data:
     dataset: HVSMR
     train_split: train

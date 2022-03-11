@@ -6,6 +6,7 @@ import logging
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from torch.nn import Dropout, Softmax, Conv2d, LayerNorm
 from torch.nn.modules.utils import _pair
@@ -16,17 +17,18 @@ logger = logging.getLogger(__name__)
 class Channel_Embeddings(nn.Module):
     """Construct the embeddings from patch, position embeddings.
     """
-    def __init__(self, patchsize, img_size, in_channels):
+    def __init__(self, patchsize, in_channels):
         super().__init__()
         patch_size = _pair(patchsize)
-        n_patches = (img_size[0] // patch_size[0]) * (img_size[1] // patch_size[1])
 
         self.patch_embeddings = Conv2d(in_channels=in_channels,
                                        out_channels=in_channels,
                                        kernel_size=patch_size,
                                        stride=patch_size)
-        self.position_embeddings = nn.Parameter(torch.zeros(1, n_patches, in_channels)).to(device)
         self.dropout = Dropout(0.1)
+
+    def _init_cell_state(self, tensor):
+        return torch.zeros(tensor.size()).to(device)
 
     def forward(self, x):
         if x is None:
@@ -35,7 +37,8 @@ class Channel_Embeddings(nn.Module):
         _, _, h, w = x.size()
         x = x.flatten(2)
         x = x.transpose(-1, -2)  # (B, n_patches, hidden)
-        embeddings = x + self.position_embeddings
+        position_embeddings = self._init_cell_state(x)
+        embeddings = x + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings, h, w
 
@@ -70,7 +73,7 @@ class Attention_org(nn.Module):
     def __init__(self, vis, channel_num):
         super(Attention_org, self).__init__()
         self.vis = vis
-        self.KV_size = 960  # KV_size = Q1 + Q2 + Q3 + Q4
+        self.KV_size = 240  # KV_size = Q1 + Q2 + Q3 + Q4
         self.channel_num = channel_num
         self.num_attention_heads = 4  # transformer.num_heads
 
@@ -233,7 +236,7 @@ class Block_ViT(nn.Module):
     def __init__(self, vis, channel_num):
         super(Block_ViT, self).__init__()
         expand_ratio = 4
-        KV_size = 960  # 16+32+64+128
+        KV_size = 240  # 16+32+64+128
         self.attn_norm1 = LayerNorm(channel_num[0], eps=1e-6)
         self.attn_norm2 = LayerNorm(channel_num[1], eps=1e-6)
         self.attn_norm3 = LayerNorm(channel_num[2], eps=1e-6)
@@ -301,10 +304,10 @@ class Encoder(nn.Module):
         self.num_layers = 4  # 超参数
         self.vis = vis
         self.layer = nn.ModuleList()
-        self.encoder_norm1 = LayerNorm(channel_num[0],eps=1e-6)
-        self.encoder_norm2 = LayerNorm(channel_num[1],eps=1e-6)
-        self.encoder_norm3 = LayerNorm(channel_num[2],eps=1e-6)
-        self.encoder_norm4 = LayerNorm(channel_num[3],eps=1e-6)
+        self.encoder_norm1 = LayerNorm(channel_num[0], eps=1e-6)
+        self.encoder_norm2 = LayerNorm(channel_num[1], eps=1e-6)
+        self.encoder_norm3 = LayerNorm(channel_num[2], eps=1e-6)
+        self.encoder_norm4 = LayerNorm(channel_num[3], eps=1e-6)
         for _ in range(self.num_layers):
             layer = Block_ViT(vis, channel_num)
             self.layer.append(copy.deepcopy(layer))
@@ -323,18 +326,18 @@ class Encoder(nn.Module):
 
 
 class ChannelTransformer(nn.Module):
-    def __init__(self, vis, img_size, channel_num, patchSize):
-        # patchSize = [32, 16, 8, 4]
+    def __init__(self, vis, channel_num):
+        patchSize = [32, 16, 8, 4]
         super().__init__()
 
         self.patchSize_1 = patchSize[0]
         self.patchSize_2 = patchSize[1]
         self.patchSize_3 = patchSize[2]
         self.patchSize_4 = patchSize[3]
-        self.embeddings_1 = Channel_Embeddings(self.patchSize_1, img_size=[img_size[0], img_size[1]],    in_channels=channel_num[0])
-        self.embeddings_2 = Channel_Embeddings(self.patchSize_2, img_size=[img_size[0]//2, img_size[1]//2], in_channels=channel_num[1])
-        self.embeddings_3 = Channel_Embeddings(self.patchSize_3, img_size=[img_size[0]//4, img_size[1]//4], in_channels=channel_num[2])
-        self.embeddings_4 = Channel_Embeddings(self.patchSize_4, img_size=[img_size[0]//8, img_size[1]//8], in_channels=channel_num[3])
+        self.embeddings_1 = Channel_Embeddings(self.patchSize_1, in_channels=channel_num[0])
+        self.embeddings_2 = Channel_Embeddings(self.patchSize_2, in_channels=channel_num[1])
+        self.embeddings_3 = Channel_Embeddings(self.patchSize_3, in_channels=channel_num[2])
+        self.embeddings_4 = Channel_Embeddings(self.patchSize_4, in_channels=channel_num[3])
         self.encoder = Encoder(vis, channel_num)
 
         self.reconstruct_1 = Reconstruct(channel_num[0], channel_num[0], kernel_size=1, scale_factor=(self.patchSize_1, self.patchSize_1))
@@ -354,6 +357,12 @@ class ChannelTransformer(nn.Module):
         x2 = self.reconstruct_2(encoded2, h2, w2) if en2 is not None else None
         x3 = self.reconstruct_3(encoded3, h3, w3) if en3 is not None else None
         x4 = self.reconstruct_4(encoded4, h4, w4) if en4 is not None else None
+
+        x4 = F.interpolate(x4, size=[en4.size(2), en4.size(3)], mode='bilinear', align_corners=True)
+        x3 = F.interpolate(x3, size=[en3.size(2), en3.size(3)], mode='bilinear', align_corners=True)
+        x2 = F.interpolate(x2, size=[en2.size(2), en2.size(3)], mode='bilinear', align_corners=True)
+        x1 = F.interpolate(x1, size=[en1.size(2), en1.size(3)], mode='bilinear', align_corners=True)
+
 
         x1 = x1 + en1 if en1 is not None else None
         x2 = x2 + en2 if en2 is not None else None
